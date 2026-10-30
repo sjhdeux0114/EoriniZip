@@ -1,0 +1,8 @@
+Brand: 어린이zip (EoriniZip)
+Created with the built-in image_gen tool, 2026-10-30.
+Original generated character, no external character reference.
+Used as logo, Windows ICO and macOS ICNS.
+Icon conversion: tools/generate-icons.ps1 (alpha-preserving format/size conversion).
+
+Prompt:
+Use case: logo-brand. Asset type: logo and Windows/macOS app icon for 어린이zip. One original adorable kindergarten child character HEAD AND FACE ONLY, wearing a bright yellow Korean kindergarten sun hat with a rounded crown and clear broad brim. Cheerful friendly small smile, warm expressive eyes, simple dark hair peeking under hat, rosy cheeks. Clean flat cartoon mascot, bold rounded dark outlines, very simple shapes and limited colors, strong silhouette readable as a tiny 32px desktop icon. Front-facing perfectly centered square composition, full hat and face visible with transparent margin. No neck, shoulders, body, hands, accessories, badge, text, letters, watermark, or background. Genuinely transparent background with clean alpha edges. Original design, not an existing cartoon character.
