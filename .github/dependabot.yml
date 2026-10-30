@@ -1,0 +1,18 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directories:
+      - /third_party/unalz
+      - /third_party/unegg
+      - /third_party/easycrab
+    schedule:
+      interval: weekly
+      day: monday
+      time: "10:00"
+      timezone: Asia/Seoul
+    open-pull-requests-limit: 5
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5

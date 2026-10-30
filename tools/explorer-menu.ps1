@@ -4,8 +4,8 @@ param(
 )
 $ErrorActionPreference='Stop'
 $base='Software\Classes'
-$clsid='{5B30EB48-528D-446B-B18E-BB516C5B902E}'
-$extensions=@('.zip','.7z','.rar','.tar','.gz','.bz2','.xz','.001')
+$clsid='{5B30EB48-528D-446B-B18E-BB516C5B902F}'
+$extensions=@('.zip','.7z','.rar','.tar','.gz','.bz2','.xz','.001','.alz','.egg','.zpaq','.ezc')
 function Verb([string]$path,[string]$label,[string]$mode) {
   $key=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey("$base\$path")
   try {
@@ -22,13 +22,15 @@ $paths=$legacy+$handlers+@("CLSID\$clsid")
 foreach($extension in $extensions) {
   $paths+="SystemFileAssociations\$extension\shell\EoriniZip.Open"
   $paths+="SystemFileAssociations\$extension\shell\EoriniZip.Extract"
+  $paths+="SystemFileAssociations\$extension\shell\EoriniZip.ExtractHere"
+  $paths+="SystemFileAssociations\$extension\shell\EoriniZip.ExtractSmart"
 }
 if($Action -eq 'Uninstall') {
   foreach($path in $paths) { [Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree("$base\$path",$false) }
   Write-Host 'EoriniZip context menu removed for the current user.'
 } else {
   $Executable=(Resolve-Path -LiteralPath $Executable).Path
-  $dll=(Resolve-Path -LiteralPath (Join-Path (Split-Path $Executable) 'EoriniZipShell_v2.dll')).Path
+  $dll=(Resolve-Path -LiteralPath (Join-Path (Split-Path $Executable) 'EoriniZipShell_v3.dll')).Path
   $key=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey("$base\CLSID\$clsid\InprocServer32")
   try { $key.SetValue('',$dll);$key.SetValue('ThreadingModel','Apartment') } finally {$key.Dispose()}
   foreach($path in $handlers){
@@ -37,8 +39,10 @@ if($Action -eq 'Uninstall') {
   }
   foreach($path in $legacy){[Microsoft.Win32.Registry]::CurrentUser.DeleteSubKeyTree("$base\$path",$false)}
   foreach($extension in $extensions) {
-    Verb "SystemFileAssociations\$extension\shell\EoriniZip.Open" '어린이zip으로 열기' '--open'
+    Verb "SystemFileAssociations\$extension\shell\EoriniZip.Open" '어린이zip으로 압축 풀기' '--extract-here'
     Verb "SystemFileAssociations\$extension\shell\EoriniZip.Extract" '어린이zip으로 새 폴더에 풀기' '--extract-folder'
+    Verb "SystemFileAssociations\$extension\shell\EoriniZip.ExtractHere" '여기에 풀기 (어린이zip)' '--extract-here'
+    Verb "SystemFileAssociations\$extension\shell\EoriniZip.ExtractSmart" '알아서 풀기 (어린이zip)' '--extract-smart'
   }
   Write-Host 'Installed native dynamic menus for current user. On Windows 11, use Show more options.'
 }

@@ -1,0 +1,30 @@
+Third-party source and native engines
+====================================
+Each upstream revision is recorded in third_party/<name>/UPSTREAM_COMMIT.
+
+unalz / unegg: Copyright (c) 2026 Sungjoon Moon, MIT.
+https://github.com/alkegi/unalz
+https://github.com/alkegi/unegg
+EoriniZip changes: machine-readable listing with control-character rejection;
+Windows-safe temporary path in an upstream test. Original codec code retained.
+Cargo.lock pins their dependencies, including libazo, flate2, bzip2, lzma-rs,
+RustCrypto encryption/hash implementations, and encoding_rs.
+
+zpaq: Matt Mahoney, public domain/Unlicense, with embedded MIT libdivsufsort
+by Yuta Mori (2003-2008). See COPYING and notices inside libzpaq.cpp.
+https://github.com/zpaq/zpaq
+EoriniZip changes: machine-readable latest-version listing. NOJIT builds are
+used to support native architectures without executable-memory JIT code.
+
+easycrab: Copyright (c) 2023 kjy00302, MIT (see upstream LICENSE for exact text).
+https://github.com/kjy00302/easycrab
+EoriniZip changes: exclusive explicit output, strict header/length/password/
+padding/checksum validation, bounded streaming, partial-file cleanup, progress.
+Password-bypass functionality from upstream is not exposed or retained.
+
+RAR fixtures: libarchive project, BSD-style license in tests/fixtures/rar/COPYING.
+https://github.com/libarchive/libarchive
+Only archive data is extracted for tests; contained programs are never executed.
+
+7-Zip: external full engine; see its License.txt. No RAR creation functionality
+is included. Distribution includes the original engine license and notices.

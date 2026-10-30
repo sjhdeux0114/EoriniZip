@@ -4,9 +4,12 @@
 #include <atomic>
 #include <string>
 #include <vector>
+#include <algorithm>
+#include <cwctype>
 #include "archive_name.hpp"
-// {5B30EB48-528D-446B-B18E-BB516C5B902E}
-const CLSID CLSID_EoriniZipMenu={0x5b30eb48,0x528d,0x446b,{0xb1,0x8e,0xbb,0x51,0x6c,0x5b,0x90,0x2e}};
+#include "shell_preview.hpp"
+// {5B30EB48-528D-446B-B18E-BB516C5B902F}
+const CLSID CLSID_EoriniZipMenu={0x5b30eb48,0x528d,0x446b,{0xb1,0x8e,0xbb,0x51,0x6c,0x5b,0x90,0x2f}};
 HMODULE module;
 std::atomic<long> objects{0};
 std::wstring quoted(const std::wstring& value) {
@@ -38,9 +41,10 @@ HBITMAP menuIcon() {
 class Menu final:public IShellExtInit,public IContextMenu {
   std::atomic<ULONG> refs{1};
   std::vector<std::filesystem::path> paths;
+  unsigned commandCount=0;UINT previewCommand=UINT_MAX;std::vector<HBITMAP> previewBitmaps;
   HBITMAP bitmap=nullptr;
 public:
-  Menu(){++objects;}~Menu(){if(bitmap)DeleteObject(bitmap);--objects;}
+  Menu(){++objects;}~Menu(){if(bitmap)DeleteObject(bitmap);for(auto icon:previewBitmaps)DeleteObject(icon);--objects;}
   IFACEMETHODIMP QueryInterface(REFIID iid,void** out) override {
     if(!out)return E_POINTER;*out=nullptr;
     if(iid==IID_IUnknown||iid==IID_IShellExtInit)*out=static_cast<IShellExtInit*>(this);
@@ -70,10 +74,43 @@ public:
       auto label=L"\""+escaped+L"\"으로 압축하기";
       if(!InsertMenuW(menu,index,MF_BYPOSITION|MF_STRING,first,L"어린이zip으로 압축하기..."))return E_FAIL;
       if(!InsertMenuW(menu,index+1,MF_BYPOSITION|MF_STRING,first+1,label.c_str())){DeleteMenu(menu,index,MF_BYPOSITION);return E_FAIL;}
-      if(!bitmap)bitmap=menuIcon();
-      if(bitmap){MENUITEMINFOW item{sizeof(item)};item.fMask=MIIM_BITMAP;item.hbmpItem=bitmap;SetMenuItemInfoW(menu,first,FALSE,&item);SetMenuItemInfoW(menu,first+1,FALSE,&item);}
-      return MAKE_HRESULT(SEVERITY_SUCCESS,0,2);
-    }catch(...){return E_FAIL;}
+      commandCount=2;
+      if(paths.size()>1&&last-first>=2){
+        if(!InsertMenuW(menu,index+2,MF_BYPOSITION|MF_STRING,first+2,L"각각 개별 압축하기"))return E_FAIL;
+        commandCount=3;
+        const bool archives=std::all_of(paths.begin(),paths.end(),[](const auto& path){
+          auto ext=path.extension().wstring();std::transform(ext.begin(),ext.end(),ext.begin(),[](wchar_t c){return static_cast<wchar_t>(towlower(c));});
+          return ext==L".zip"||ext==L".7z"||ext==L".rar"||ext==L".tar"||ext==L".gz"||ext==L".bz2"||ext==L".xz"||ext==L".alz"||ext==L".egg"||ext==L".zpaq"||ext==L".001"||ext==L".cab"||ext==L".iso"||ext==L".wim";
+        });
+        if(archives&&last-first>=3){
+          if(!InsertMenuW(menu,index+3,MF_BYPOSITION|MF_STRING,first+3,L"각각 풀기"))return E_FAIL;
+          commandCount=4;
+        }
+      }
+      previewCommand=UINT_MAX;
+      if(paths.size()==1&&last-first>=commandCount){
+        auto ext=paths[0].extension().wstring();std::transform(ext.begin(),ext.end(),ext.begin(),[](wchar_t c){return static_cast<wchar_t>(towlower(c));});
+        if(ext==L".zip"){
+          HMENU preview=CreatePopupMenu();if(!preview)return E_OUTOFMEMORY;
+          auto entries=kz::shell::preview(paths[0]);previewCommand=commandCount++;
+          if(entries.empty())AppendMenuW(preview,MF_STRING,first+previewCommand,L"열어서 내부 목록 보기...");
+          for(const auto& entry:entries){
+            std::wstring title;for(wchar_t c:entry.name){title+=c;if(c==L'&')title+=L'&';}
+            AppendMenuW(preview,MF_STRING,first+previewCommand,title.c_str());
+            SHFILEINFOW info{};if(SHGetFileInfoW(entry.name.c_str(),entry.directory?FILE_ATTRIBUTE_DIRECTORY:FILE_ATTRIBUTE_NORMAL,&info,sizeof(info),SHGFI_ICON|SHGFI_SMALLICON|SHGFI_USEFILEATTRIBUTES)){
+              BITMAPINFO bits{};bits.bmiHeader.biSize=sizeof(BITMAPINFOHEADER);bits.bmiHeader.biWidth=16;bits.bmiHeader.biHeight=-16;bits.bmiHeader.biPlanes=1;bits.bmiHeader.biBitCount=32;bits.bmiHeader.biCompression=BI_RGB;
+              HDC dc=CreateCompatibleDC(nullptr);void* data=nullptr;HBITMAP icon=CreateDIBSection(dc,&bits,DIB_RGB_COLORS,&data,nullptr,0);
+              if(icon){ZeroMemory(data,16*16*4);auto old=SelectObject(dc,icon);DrawIconEx(dc,0,0,info.hIcon,16,16,0,nullptr,DI_NORMAL);SelectObject(dc,old);
+                MENUITEMINFOW item{sizeof(item)};item.fMask=MIIM_BITMAP;item.hbmpItem=icon;SetMenuItemInfoW(preview,GetMenuItemCount(preview)-1,TRUE,&item);previewBitmaps.push_back(icon);}
+              DeleteDC(dc);DestroyIcon(info.hIcon);
+            }
+          }
+          if(!InsertMenuW(menu,index+commandCount-1,MF_BYPOSITION|MF_POPUP|MF_STRING,reinterpret_cast<UINT_PTR>(preview),L"압축 파일 미리 보기")){DestroyMenu(preview);return E_FAIL;}
+        }
+      }      if(!bitmap)bitmap=menuIcon();
+      if(bitmap){MENUITEMINFOW item{sizeof(item)};item.fMask=MIIM_BITMAP;item.hbmpItem=bitmap;
+        for(UINT i=0;i<commandCount;++i)SetMenuItemInfoW(menu,first+i,FALSE,&item);}
+      return MAKE_HRESULT(SEVERITY_SUCCESS,0,commandCount);    }catch(...){return E_FAIL;}
   }
   IFACEMETHODIMP InvokeCommand(CMINVOKECOMMANDINFO* info) override {
     if(!info)return E_POINTER;
@@ -81,13 +118,16 @@ public:
     if(HIWORD(info->lpVerb)){
       if(lstrcmpiA(info->lpVerb,"eorinizip.compress")==0)verb=0;
       else if(lstrcmpiA(info->lpVerb,"eorinizip.quick")==0)verb=1;
+      else if(lstrcmpiA(info->lpVerb,"eorinizip.preview")==0)verb=previewCommand;
+      else if(lstrcmpiA(info->lpVerb,"eorinizip.each")==0)verb=2;
+      else if(lstrcmpiA(info->lpVerb,"eorinizip.extractEach")==0)verb=3;
       else return E_INVALIDARG;
     }else verb=LOWORD(info->lpVerb);
-    if(verb>1||paths.empty())return E_INVALIDARG;
+    if(verb>=commandCount||paths.empty())return E_INVALIDARG;
     try{
       wchar_t filename[32768];DWORD n=GetModuleFileNameW(module,filename,32768);if(!n||n>=32768)return E_FAIL;
       auto executable=std::filesystem::path(filename).parent_path()/L"EoriniZip.exe";
-      std::wstring command=quoted(executable.wstring())+(verb?L" --compress-quick":L" --compress");
+      std::wstring command=quoted(executable.wstring())+(verb==previewCommand?L" --open":verb==0?L" --compress":verb==1?L" --compress-quick":verb==2?L" --compress-each":L" --extract-each");
       for(const auto& path:paths)command+=L" "+quoted(path.wstring());
       if(command.size()>=32767)return HRESULT_FROM_WIN32(ERROR_FILENAME_EXCED_RANGE);
       STARTUPINFOW startup{};startup.cb=sizeof(startup);PROCESS_INFORMATION process{};
@@ -96,9 +136,10 @@ public:
     }catch(...){return E_FAIL;}
   }
   IFACEMETHODIMP GetCommandString(UINT_PTR id,UINT flags,UINT*,LPSTR text,UINT count) override {
-    if(id>1)return E_INVALIDARG;
-    if(flags==GCS_VERBA)return lstrcpynA(text,id?"eorinizip.quick":"eorinizip.compress",count)?S_OK:E_FAIL;
-    if(flags==GCS_VERBW)return lstrcpynW(reinterpret_cast<LPWSTR>(text),id?L"eorinizip.quick":L"eorinizip.compress",count)?S_OK:E_FAIL;
+    if(id>=commandCount)return E_INVALIDARG;
+    if(id==previewCommand){if(flags==GCS_VERBA)return lstrcpynA(text,"eorinizip.preview",count)?S_OK:E_FAIL;if(flags==GCS_VERBW)return lstrcpynW(reinterpret_cast<LPWSTR>(text),L"eorinizip.preview",count)?S_OK:E_FAIL;}
+    if(flags==GCS_VERBA)return lstrcpynA(text,id==0?"eorinizip.compress":id==1?"eorinizip.quick":id==2?"eorinizip.each":"eorinizip.extractEach",count)?S_OK:E_FAIL;
+    if(flags==GCS_VERBW)return lstrcpynW(reinterpret_cast<LPWSTR>(text),id==0?L"eorinizip.compress":id==1?L"eorinizip.quick":id==2?L"eorinizip.each":L"eorinizip.extractEach",count)?S_OK:E_FAIL;
     return E_NOTIMPL;
   }
 };

@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+ xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+ xmlns:uap10="http://schemas.microsoft.com/appx/manifest/uap/windows10/10"
+ xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+ xmlns:desktop4="http://schemas.microsoft.com/appx/manifest/desktop/windows10/4"
+ xmlns:desktop5="http://schemas.microsoft.com/appx/manifest/desktop/windows10/5"
+ xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+ IgnorableNamespaces="uap uap10 com desktop4 desktop5 rescap">
+ <Identity Name="EoriniZip.ContextMenu" Publisher="CN=EoriniZip" Version="0.5.0.0" ProcessorArchitecture="x64"/>
+ <Properties><DisplayName>어린이zip</DisplayName><PublisherDisplayName>EoriniZip</PublisherDisplayName><Logo>Assets\StoreLogo.png</Logo><uap10:AllowExternalContent>true</uap10:AllowExternalContent></Properties>
+ <Resources><Resource Language="ko-KR"/></Resources>
+ <Dependencies><TargetDeviceFamily Name="Windows.Desktop" MinVersion="10.0.22000.0" MaxVersionTested="10.0.26100.0"/></Dependencies>
+ <Applications>
+  <Application Id="EoriniZip" Executable="EoriniZip.exe" uap10:RuntimeBehavior="win32App" uap10:TrustLevel="mediumIL">
+   <uap:VisualElements DisplayName="어린이zip" Description="네이티브 압축 프로그램" BackgroundColor="transparent" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png"/>
+   <Extensions>
+    <com:Extension Category="windows.comServer"><com:ComServer><com:SurrogateServer DisplayName="어린이zip 메뉴"><com:Class Id="5B30EB48-528D-446B-B18E-BB516C5B9030" Path="EoriniZipModernShell.dll" ThreadingModel="STA"/></com:SurrogateServer></com:ComServer></com:Extension>
+    <desktop4:Extension Category="windows.fileExplorerContextMenus"><desktop4:FileExplorerContextMenus>
+     <desktop5:ItemType Type="*"><desktop5:Verb Id="EoriniZipFiles" Clsid="5B30EB48-528D-446B-B18E-BB516C5B9030"/></desktop5:ItemType>
+     <desktop5:ItemType Type="Directory"><desktop5:Verb Id="EoriniZipFolders" Clsid="5B30EB48-528D-446B-B18E-BB516C5B9030"/></desktop5:ItemType>
+    </desktop4:FileExplorerContextMenus></desktop4:Extension>
+   </Extensions>
+  </Application>
+ </Applications>
+ <Capabilities><rescap:Capability Name="runFullTrust"/><rescap:Capability Name="unvirtualizedResources"/></Capabilities>
+</Package>

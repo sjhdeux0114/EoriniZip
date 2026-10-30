@@ -1,0 +1,4 @@
+LIBRARY EoriniZipModernShell
+EXPORTS
+  DllGetClassObject PRIVATE
+  DllCanUnloadNow PRIVATE

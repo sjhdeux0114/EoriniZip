@@ -1,5 +1,7 @@
 #include "core.hpp"
 #include <stdexcept>
+#include <algorithm>
+#include <cctype>
 #ifdef _WIN32
 #include <windows.h>
 #else
@@ -21,9 +23,10 @@ void Engine::cancel() {
   kill(static_cast<pid_t>(process_), SIGTERM);
 #endif
 }
-std::string Engine::run(const std::vector<std::string>& args) {
+std::string Engine::run(const std::vector<std::string>& args,const fs::path& program,int operation) {
+  const auto executable=program.empty()?executable_:program;
   if (cancelled_) throw std::runtime_error("Operation cancelled.");
-  progress_=-1;phase_=args.empty()?0:args[0]=="a"?1:args[0]=="x"?2:args[0]=="t"?3:4;
+  progress_=-1;phase_=operation?operation:args.empty()?0:args[0]=="a"?1:args[0]=="x"?2:args[0]=="t"?3:4;
   std::string progressLine;
   auto consume=[&](const char* bytes,size_t count){
     for(size_t i=0;i<count;++i){
@@ -48,7 +51,7 @@ std::string Engine::run(const std::vector<std::string>& args) {
   SetHandleInformation(read.value, HANDLE_FLAG_INHERIT, 0);
   input.value = CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &security, OPEN_EXISTING, 0, nullptr);
   if (input.value == INVALID_HANDLE_VALUE) throw std::runtime_error("Cannot create engine input.");
-  std::wstring command = quoteWindows(executable_.wstring());
+  std::wstring command = quoteWindows(executable.wstring());
   for (const auto& arg : args) command += L" " + quoteWindows(widen(arg));
   STARTUPINFOW startup{}; startup.cb = sizeof(startup); startup.dwFlags = STARTF_USESTDHANDLES;
   startup.hStdInput = input.value; startup.hStdOutput = startup.hStdError = write.value;
@@ -56,14 +59,14 @@ std::string Engine::run(const std::vector<std::string>& args) {
   {
     std::lock_guard<std::mutex> lock(processMutex_);
     if (cancelled_) throw std::runtime_error("Operation cancelled.");
-    if (!CreateProcessW(executable_.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &startup, &info)) throw std::runtime_error("Cannot start 7-Zip. Select the official full engine.");
+    if (!CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &startup, &info)) throw std::runtime_error("Cannot start archive engine. Check that its executable is installed.");
     process.value = info.hProcess; thread.value = info.hThread; process_ = reinterpret_cast<intptr_t>(info.hProcess);
   }
   CloseHandle(write.value); write.value = nullptr;
   char buffer[8192]; DWORD count;
   while (ReadFile(read.value, buffer, sizeof(buffer), &count, nullptr) && count) {
     consume(buffer,count);
-    if(args[0]!="l"&&output.size()>65536)output.erase(0,output.size()-32768);
+    if(phase_!=4&&output.size()>65536)output.erase(0,output.size()-32768);
     if (output.size() + count > cap) { overflow = true; cancel(); break; }
     output.append(buffer, count);
   }
@@ -78,20 +81,20 @@ std::string Engine::run(const std::vector<std::string>& args) {
   posix_spawn_file_actions_adddup2(&actions, pipes[1], STDOUT_FILENO);
   posix_spawn_file_actions_adddup2(&actions, pipes[1], STDERR_FILENO);
   posix_spawn_file_actions_addclose(&actions, pipes[0]); posix_spawn_file_actions_addclose(&actions, pipes[1]);
-  std::vector<std::string> strings{executable_.string()}; strings.insert(strings.end(), args.begin(), args.end());
+  std::vector<std::string> strings{executable.string()}; strings.insert(strings.end(), args.begin(), args.end());
   std::vector<char*> argv; for (auto& arg : strings) argv.push_back(arg.data()); argv.push_back(nullptr);
   pid_t pid = 0; int result;
   { std::lock_guard<std::mutex> lock(processMutex_);
-    result = cancelled_ ? ECANCELED : posix_spawn(&pid, executable_.c_str(), &actions, nullptr, argv.data(), environ);
+    result = cancelled_ ? ECANCELED : posix_spawn(&pid, executable.c_str(), &actions, nullptr, argv.data(), environ);
     if (!result) process_ = pid;
   }
   posix_spawn_file_actions_destroy(&actions); close(pipes[1]);
-  if (result) { close(pipes[0]); throw std::runtime_error("Cannot start 7zz. Select the official engine."); }
+  if (result) { close(pipes[0]); throw std::runtime_error("Cannot start archive engine. Check that its executable is installed."); }
   char buffer[8192]; ssize_t count;
   while ((count = read(pipes[0], buffer, sizeof(buffer))) != 0) {
     if (count < 0) { if (errno == EINTR) continue; break; }
     consume(buffer,static_cast<size_t>(count));
-    if(args[0]!="l"&&output.size()>65536)output.erase(0,output.size()-32768);
+    if(phase_!=4&&output.size()>65536)output.erase(0,output.size()-32768);
     if (output.size() + static_cast<size_t>(count) > cap) { overflow = true; cancel(); break; }
     output.append(buffer, static_cast<size_t>(count));
   }
@@ -102,7 +105,12 @@ std::string Engine::run(const std::vector<std::string>& args) {
 #endif
   if (overflow) throw std::runtime_error("Engine output exceeded safety limit.");
   if (cancelled_) throw std::runtime_error("Operation cancelled.");
-  if (code != 0) throw std::runtime_error("7-Zip error " + std::to_string(code) + ". Check password, format and archive integrity.");
+  if(code!=0){
+    auto lower=output;std::transform(lower.begin(),lower.end(),lower.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
+    for(const auto& message:{"wrong password","incorrect password","invalid password","password required","password is incorrect","enter password"})
+      if(lower.find(message)!=std::string::npos)throw PasswordRequired("암호가 필요하거나 입력한 암호가 올바르지 않습니다.");
+  }
+  if (code != 0) throw std::runtime_error( "Archive engine error " + std::to_string(code) + ". Check password, format and archive integrity.");
   progress_=100;return output;
 }
 }

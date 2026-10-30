@@ -11,18 +11,32 @@ if errorlevel 1 exit /b 1
 if defined KZ_SDK_INCLUDE set "INCLUDE=%KZ_SDK_INCLUDE%;%INCLUDE%"
 if defined KZ_SDK_LIB set "LIB=%KZ_SDK_LIB%;%LIB%"
 if defined KZ_SDK_BIN set "PATH=%KZ_SDK_BIN%;%PATH%"
-if not exist build mkdir build
-rc /nologo /I native /fo build\windows.res native\windows.rc
+if not defined KZ_BUILD_DIR set "KZ_BUILD_DIR=build"
+if not exist "%KZ_BUILD_DIR%" mkdir "%KZ_BUILD_DIR%"
+call tools\build-formats.cmd
 if errorlevel 1 exit /b 1
-cl /nologo /std:c++17 /utf-8 /EHsc /W4 /O2 /MT /DUNICODE /D_UNICODE /DNOMINMAX /I native native\core.cpp native\process.cpp native\windows.cpp build\windows.res /Fo:build\ /Fe:build\EoriniZip.exe /link /SUBSYSTEM:WINDOWS comctl32.lib ole32.lib shell32.lib uuid.lib user32.lib gdi32.lib msimg32.lib advapi32.lib comdlg32.lib
+rc /nologo /I native /fo %KZ_BUILD_DIR%\windows.res native\windows.rc
 if errorlevel 1 exit /b 1
-cl /nologo /std:c++17 /utf-8 /EHsc /W4 /O2 /MT /DUNICODE /D_UNICODE /DNOMINMAX /I native native\core.cpp native\process.cpp tests\core_tests.cpp /Fo:build\ /Fe:build\core_tests.exe
+cl /nologo /std:c++17 /utf-8 /EHsc /W4 /O2 /MT /DUNICODE /D_UNICODE /DNOMINMAX /I native native\core.cpp native\process.cpp native\windows.cpp %KZ_BUILD_DIR%\windows.res /Fo:%KZ_BUILD_DIR%\ /Fe:%KZ_BUILD_DIR%\EoriniZip.exe /link /SUBSYSTEM:WINDOWS comctl32.lib ole32.lib shell32.lib uuid.lib user32.lib gdi32.lib msimg32.lib advapi32.lib comdlg32.lib gdiplus.lib
 if errorlevel 1 exit /b 1
-cl /nologo /std:c++17 /utf-8 /EHsc /W4 /O2 /MT /LD /DUNICODE /D_UNICODE /DNOMINMAX /I native native\shell_menu.cpp /Fo:build\ /Fe:build\EoriniZipShell_v2.dll /link /DEF:native\shell_menu.def gdi32.lib shell32.lib ole32.lib user32.lib uuid.lib
+cl /nologo /std:c++17 /utf-8 /EHsc /W4 /O2 /MT /DUNICODE /D_UNICODE /DNOMINMAX /I native native\core.cpp native\process.cpp tests\core_tests.cpp /Fo:%KZ_BUILD_DIR%\ /Fe:%KZ_BUILD_DIR%\core_tests.exe
 if errorlevel 1 exit /b 1
-cl /nologo /std:c++17 /utf-8 /EHsc /W4 /O2 /MT /DUNICODE /D_UNICODE /DNOMINMAX tests\shell_menu_tests.cpp /Fo:build\ /Fe:build\shell_menu_tests.exe /link shell32.lib ole32.lib user32.lib uuid.lib
+cl /nologo /std:c++17 /utf-8 /EHsc /W4 /O2 /MT /DUNICODE /D_UNICODE /DNOMINMAX /I native native\core.cpp native\process.cpp tests\split_tests.cpp /Fo:%KZ_BUILD_DIR%\ /Fe:%KZ_BUILD_DIR%\split_tests.exe
 if errorlevel 1 exit /b 1
-build\shell_menu_tests.exe "%CD%\build\EoriniZipShell_v2.dll"
+cl /nologo /std:c++17 /utf-8 /EHsc /W4 /O2 /MT /LD /DUNICODE /D_UNICODE /DNOMINMAX /I native native\shell_menu.cpp /Fo:%KZ_BUILD_DIR%\ /Fe:%KZ_BUILD_DIR%\EoriniZipShell_v3.dll /link /DEF:native\shell_menu.def gdi32.lib shell32.lib ole32.lib user32.lib uuid.lib
 if errorlevel 1 exit /b 1
-build\core_tests.exe
+cl /nologo /std:c++17 /utf-8 /EHsc /W4 /O2 /MT /LD /DUNICODE /D_UNICODE /DNOMINMAX /I native native\modern_shell.cpp /Fo:%KZ_BUILD_DIR%\ /Fe:%KZ_BUILD_DIR%\EoriniZipModernShell.dll /link /DEF:native\modern_shell.def shell32.lib ole32.lib user32.lib uuid.lib
+if errorlevel 1 exit /b 1
+cl /nologo /std:c++17 /utf-8 /EHsc /W4 /O2 /MT /DUNICODE /D_UNICODE /DNOMINMAX tests\shell_menu_tests.cpp /Fo:%KZ_BUILD_DIR%\ /Fe:%KZ_BUILD_DIR%\shell_menu_tests.exe /link shell32.lib ole32.lib user32.lib uuid.lib
+if errorlevel 1 exit /b 1
+%KZ_BUILD_DIR%\shell_menu_tests.exe "%CD%\%KZ_BUILD_DIR%\EoriniZipShell_v3.dll"
+if errorlevel 1 exit /b 1
+%KZ_BUILD_DIR%\core_tests.exe
+cl /nologo /std:c++17 /utf-8 /EHsc /W4 /O2 /MT /DUNICODE /D_UNICODE /DNOMINMAX tests\modern_shell_tests.cpp /Fo:%KZ_BUILD_DIR%\ /Fe:%KZ_BUILD_DIR%\modern_shell_tests.exe /link shell32.lib ole32.lib user32.lib uuid.lib
+if errorlevel 1 exit /b 1
+%KZ_BUILD_DIR%\modern_shell_tests.exe "%CD%\%KZ_BUILD_DIR%\EoriniZipModernShell.dll"
+if errorlevel 1 exit /b 1
+cl /nologo /std:c++17 /utf-8 /EHsc /W4 /O2 /MT /DUNICODE /D_UNICODE /I native tests\dialog_resource_tests.cpp /Fo:%KZ_BUILD_DIR%\ /Fe:%KZ_BUILD_DIR%\dialog_resource_tests.exe
+if errorlevel 1 exit /b 1
+%KZ_BUILD_DIR%\dialog_resource_tests.exe "%CD%\%KZ_BUILD_DIR%\EoriniZip.exe"
 exit /b %errorlevel%

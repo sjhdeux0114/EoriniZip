@@ -4,8 +4,10 @@
 #include <vector>
 #include <atomic>
 #include <mutex>
+#include <stdexcept>
 namespace kz {
 namespace fs = std::filesystem;
+class PasswordRequired : public std::runtime_error { public: using std::runtime_error::runtime_error; };
 struct Entry { std::string name, modified; uint64_t size = 0, packed = 0; bool directory = false, encrypted = false, link = false; };
 struct Options { std::string format = "zip", password, split; int level = 5; bool hideNames = false, unicodeNames=true, storeTimes=true, excludeThumbs=false, multiThread=true; };
 std::vector<Entry> parseListing(const std::string& text);
@@ -24,11 +26,17 @@ class Engine {
   void resetCancel() { cancelled_ = false; }
   std::vector<Entry> list(const fs::path&, const std::string& password = "");
   void test(const fs::path&, const std::string& password = "");
+  void edit(const fs::path&, const std::string& action, const std::vector<std::string>& names, const std::string& password = "");
   fs::path create(const Options&, const fs::path&, const std::vector<fs::path>&);
+  std::vector<fs::path> createEach(const std::vector<fs::path>&);
+  std::vector<fs::path> extractEach(const std::vector<fs::path>&, const std::string& password = "");
+  fs::path decryptEasyCrypt(const fs::path&, const fs::path&, const std::string&);
   fs::path createQuick(const std::vector<fs::path>&);
-  fs::path extract(const fs::path&, const fs::path&, const std::string& password = "");
+  fs::path extract(const fs::path&, const fs::path&, const std::string& password = "", const std::vector<std::string>& selected = {});
+  fs::path extractSmart(const fs::path&, const fs::path&, const std::string& password = "", bool forceFolder = false);
  private:
-  std::string run(const std::vector<std::string>&);
+  std::string run(const std::vector<std::string>&, const fs::path& program = {}, int operation = 0);
+  fs::path codec(const std::string&) const;
   fs::path executable_;
   int codePage_=0; bool parallel_=true,propagateZone_=true;
   std::atomic<bool> cancelled_{false};
