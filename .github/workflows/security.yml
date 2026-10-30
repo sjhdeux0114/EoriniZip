@@ -15,13 +15,13 @@ jobs:
       matrix:
         codec: [unalz, unegg, easycrab]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: cargo install cargo-audit --version 0.22.2 --locked
       - run: cargo audit --file third_party/${{ matrix.codec }}/Cargo.lock
   upstream:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: python3 tools/check-upstreams.py
         env:
           GITHUB_TOKEN: ${{ github.token }}
