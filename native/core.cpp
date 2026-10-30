@@ -1,4 +1,5 @@
 #include "core.hpp"
+#include "archive_name.hpp"
 #include <algorithm>
 #include <cctype>
 #include <map>
@@ -7,7 +8,13 @@
 #include <stdexcept>
 #include <random>
 #include <regex>
+#include <fstream>
 #include <codecvt>
+#ifdef _WIN32
+#include <windows.h>
+#elif defined(__APPLE__)
+#include <stdio.h>
+#endif
 namespace kz {
 std::wstring widen(const std::string& s) { return std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>{}.from_bytes(s); }
 std::string narrow(const std::wstring& s) { return std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>>{}.to_bytes(s); }
@@ -31,7 +38,13 @@ std::vector<std::string> createArgs(const Options& o, const fs::path& output, co
   if (!o.split.empty() && !std::regex_match(o.split, std::regex("[1-9][0-9]{0,12}[bBkKmMgG]"))) throw std::runtime_error("Split size must look like 100m or 2g.");
   if (o.format == "tar" && (!o.password.empty() || !o.split.empty() || o.hideNames)) throw std::runtime_error("TAR does not support encryption/split options.");
   if (o.hideNames && (o.format != "7z" || o.password.empty())) throw std::runtime_error("Filename encryption requires 7Z and a password.");
-  std::vector<std::string> args = {"a", "-t" + o.format, "-mx=" + std::to_string(o.level), "-bd", "-y", "-sccUTF-8", "-spd"};
+  std::vector<std::string> args = {"a", "-t" + o.format, "-mx=" + std::to_string(o.level), "-bsp1", "-y", "-sccUTF-8", "-spd"};
+  if(o.format!="tar"){
+    args.push_back(o.multiThread?"-mmt=on":"-mmt=off");
+    args.push_back(o.storeTimes?"-mtc=on":"-mtc=off");args.push_back(o.storeTimes?"-mta=on":"-mta=off");
+  }
+  if(o.format=="zip")args.push_back(o.unicodeNames?"-mcu=on":"-mcu=off");
+  if(o.excludeThumbs)args.push_back("-xr!Thumbs.db");
   if (!o.password.empty()) { args.push_back("-p" + o.password); if (o.format == "zip") args.push_back("-mem=AES256"); }
   if (o.hideNames) args.push_back("-mhe=on");
   if (!o.split.empty()) args.push_back("-v" + o.split);
@@ -87,8 +100,13 @@ void validateEntries(const std::vector<Entry>& entries) {
 static fs::path freshDirectory(const fs::path& parent) {
   std::random_device random;
   for (int i = 0; i < 32; ++i) {
-    auto p = parent / ("EoriniZip-" + std::to_string(random()) + "-" + std::to_string(random()));
-    if (fs::create_directory(p)) return p;
+    auto p = parent / (".eorinizip-tmp-" + std::to_string(random()) + "-" + std::to_string(random()));
+    if (fs::create_directory(p)) {
+#ifdef _WIN32
+      SetFileAttributesW(p.c_str(),FILE_ATTRIBUTE_HIDDEN);
+#endif
+      return p;
+    }
   }
   throw std::runtime_error("Cannot create output directory.");
 }
@@ -99,26 +117,110 @@ std::vector<Entry> Engine::list(const fs::path& archive, const std::string& pass
   passwordCheck(password);
   std::vector<std::string> args = {"l", "-slt", "-ba", "-sccUTF-8"};
   if (!password.empty()) args.push_back("-p" + password);
+  if(codePage_&&ext==".zip"&&std::find(args.begin(),args.end(),"-mcp="+std::to_string(codePage_))==args.end())args.push_back("-mcp="+std::to_string(codePage_));
   args.insert(args.end(), {"--", fs::absolute(archive).u8string()}); return parseListing(run(args));
 }
 void Engine::test(const fs::path& archive, const std::string& password) {
-  passwordCheck(password); std::vector<std::string> args = {"t", "-bd", "-sccUTF-8"};
+  passwordCheck(password); std::vector<std::string> args = {"t", "-bsp1", "-sccUTF-8"};
   if (!password.empty()) args.push_back("-p" + password);
   args.insert(args.end(), {"--", fs::absolute(archive).u8string()}); run(args);
 }
-fs::path Engine::create(const Options& o, const fs::path& output, const std::vector<fs::path>& inputs) {
-  createArgs(o, output, inputs);
-  const auto destination = freshDirectory(fs::absolute(output).parent_path());
-  try { run(createArgs(o, destination / output.filename(), inputs)); return destination; }
-  catch (...) { std::error_code ec; fs::remove_all(destination, ec); throw; }
+static void moveExclusive(const fs::path& from,const fs::path& to) {
+#ifdef _WIN32
+  if(!MoveFileExW(from.c_str(),to.c_str(),0))throw fs::filesystem_error("Move output",from,to,std::error_code(GetLastError(),std::system_category()));
+#elif defined(__APPLE__)
+  if(renamex_np(from.c_str(),to.c_str(),RENAME_EXCL))throw fs::filesystem_error("Move output",from,to,std::error_code(errno,std::generic_category()));
+#else
+  if(fs::exists(to))throw std::runtime_error("Output already exists");
+  fs::rename(from,to);
+#endif
 }
-fs::path Engine::extract(const fs::path& archive, const fs::path& parent, const std::string& password) {
-  validateEntries(list(archive, password));
-  auto destination = freshDirectory(parent);
+static fs::path numbered(const fs::path& desired,unsigned number) {
+  if(!number)return desired;
+  return desired.parent_path()/fs::u8path(desired.stem().u8string()+" ("+std::to_string(number)+")"+desired.extension().u8string());
+}
+fs::path Engine::create(const Options& o, const fs::path& output, const std::vector<fs::path>& inputs) {
+  createArgs(o,output,inputs);
+  const auto requested=fs::absolute(output);
+  for(const auto& input:inputs)if(fs::is_directory(input)){
+    auto relative=fs::weakly_canonical(requested.parent_path()).lexically_relative(fs::weakly_canonical(input));
+    if(relative.empty()||(*relative.begin()!=fs::path("..")&&!relative.is_absolute()))throw std::runtime_error("압축 대상 폴더 밖에 결과 파일을 저장하세요.");
+  }
+  // Staging stays on the same volume so publishing is a move, not another full copy.
+  const auto staging=freshDirectory(requested.parent_path());
+  std::vector<std::pair<fs::path,fs::path>> moved;
   try {
-    std::vector<std::string> args = {"x", "-bd", "-y", "-sccUTF-8", "-o" + destination.u8string()};
-    if (!password.empty()) args.push_back("-p" + password);
-    args.insert(args.end(), {"--", fs::absolute(archive).u8string()}); run(args); return destination;
-  } catch (...) { std::error_code ec; fs::remove_all(destination, ec); throw; }
+    run(createArgs(o,staging/requested.filename(),inputs));
+    std::vector<fs::path> volumes;for(const auto& entry:fs::directory_iterator(staging))volumes.push_back(entry.path());
+    std::sort(volumes.begin(),volumes.end());
+    if(volumes.empty())throw std::runtime_error("No archive was produced.");
+    fs::path chosen;
+    for(unsigned n=0;n<10000;++n){
+      auto candidate=numbered(requested,n);bool available=!fs::exists(candidate);
+      for(const auto& volume:volumes){
+        auto suffix=volume.filename().u8string().substr(requested.filename().u8string().size());
+        auto target=fs::u8path(candidate.u8string()+suffix);
+        if(fs::exists(target))available=false;
+      }
+      if(available){chosen=candidate;break;}
+    }
+    if(chosen.empty())throw std::runtime_error("Cannot find an unused archive name.");
+    for(const auto& volume:volumes){
+      if(cancelled_)throw std::runtime_error("Operation cancelled.");
+      auto target=fs::u8path(chosen.u8string()+volume.filename().u8string().substr(requested.filename().u8string().size()));
+      moveExclusive(volume,target);moved.emplace_back(target,volume);
+    }
+    std::error_code ec;fs::remove(staging,ec);
+    return o.split.empty()?chosen:fs::u8path(chosen.u8string()+".001");
+  }catch(...){
+    for(auto it=moved.rbegin();it!=moved.rend();++it){try{moveExclusive(it->first,it->second);}catch(...){}}
+    std::error_code ec;fs::remove_all(staging,ec);throw;
+  }
+}
+fs::path Engine::createQuick(const std::vector<fs::path>& inputs) {
+  if(inputs.empty())throw std::runtime_error("압축할 파일이 없습니다.");
+  Options options;options.level=1;options.multiThread=parallel_;
+  return create(options,suggestedArchive(inputs),inputs);
+}
+fs::path Engine::extract(const fs::path& archive,const fs::path& parent,const std::string& password) {
+  auto entries=list(archive,password);validateEntries(entries);
+  if(!fs::is_directory(parent))throw std::runtime_error("대상 폴더가 존재하지 않습니다.");
+  // Existing top-level names are rejected before extraction; originals remain intact.
+  for(const auto& entry:entries){
+    auto name=entry.name;std::replace(name.begin(),name.end(),'\\','/');
+    auto top=name.substr(0,name.find('/'));
+    if(fs::exists(parent/fs::u8path(top)))throw std::runtime_error("대상에 같은 이름이 있습니다. 빈 폴더를 선택하세요: "+top);
+  }
+  auto staging=freshDirectory(parent);
+  std::vector<std::pair<fs::path,fs::path>> moved;
+  try {
+    std::vector<std::string> args={"x","-bsp1",parallel_?"-mmt=on":"-mmt=off","-y","-sccUTF-8","-o"+staging.u8string()};
+    auto ext=archive.extension().u8string();std::transform(ext.begin(),ext.end(),ext.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
+    if(codePage_&&ext==".zip")args.push_back("-mcp="+std::to_string(codePage_));
+    if(!password.empty())args.push_back("-p"+password);
+    args.insert(args.end(),{"--",fs::absolute(archive).u8string()});run(args);
+#ifdef _WIN32
+    if(propagateZone_){
+      std::ifstream zone(fs::path(archive.wstring()+L":Zone.Identifier"),std::ios::binary);
+      if(zone){
+        std::string metadata;char buffer[4096];while(zone.read(buffer,sizeof(buffer))||zone.gcount()){metadata.append(buffer,static_cast<size_t>(zone.gcount()));if(metadata.size()>65536)throw std::runtime_error("다운로드 출처 정보가 너무 큽니다.");}
+        for(const auto& entry:fs::recursive_directory_iterator(staging))if(entry.is_regular_file()){
+          std::ofstream output(fs::path(entry.path().wstring()+L":Zone.Identifier"),std::ios::binary);
+          output.write(metadata.data(),static_cast<std::streamsize>(metadata.size()));
+          if(!output)throw std::runtime_error("다운로드 출처 정보를 저장할 수 없습니다.");
+        }
+      }
+    }
+#endif
+    std::vector<fs::path> children;for(const auto& entry:fs::directory_iterator(staging))children.push_back(entry.path());
+    for(const auto& child:children){
+      if(cancelled_)throw std::runtime_error("Operation cancelled.");
+      auto target=parent/child.filename();moveExclusive(child,target);moved.emplace_back(target,child);
+    }
+    std::error_code ec;fs::remove(staging,ec);return parent;
+  }catch(...){
+    for(auto it=moved.rbegin();it!=moved.rend();++it){try{moveExclusive(it->first,it->second);}catch(...){}}
+    std::error_code ec;fs::remove_all(staging,ec);throw;
+  }
 }
 }

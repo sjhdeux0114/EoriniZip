@@ -1,6 +1,7 @@
 #import <Cocoa/Cocoa.h>
 #include "core.hpp"
 #include "split_presets.hpp"
+#include "archive_name.hpp"
 #include <memory>
 #include <functional>
 static NSString* S(const std::string& s) { return [[NSString alloc] initWithBytes:s.data() length:s.size() encoding:NSUTF8StringEncoding] ?: @"Invalid UTF-8"; }
@@ -62,7 +63,7 @@ static NSString* S(const std::string& s) { return [[NSString alloc] initWithByte
   self.split=[[NSTextField alloc] initWithFrame:NSMakeRect(690,508,100,28)]; self.split.placeholderString=@"예: 100m"; [self.window.contentView addSubview:self.split];
   self.hideNames=[NSButton checkboxWithTitle:@"파일명 암호화 (7Z)" target:nil action:nil]; self.hideNames.frame=NSMakeRect(800,508,220,28); [self.window.contentView addSubview:self.hideNames];
   [self.controls addObjectsFromArray:@[self.format,self.password,self.split,self.splitPreset,self.hideNames]];
-  self.location=[self label:@"압축파일을 열거나 새로 압축하세요. 결과는 새 어린이zip 폴더에 저장됩니다." frame:NSMakeRect(20,468,990,28)];
+  self.location=[self label:@"압축파일을 열거나 새로 압축하세요. 결과는 지정한 위치에 저장됩니다." frame:NSMakeRect(20,468,990,28)];
   NSScrollView* scroll=[[NSScrollView alloc] initWithFrame:NSMakeRect(20,65,1000,390)]; scroll.hasVerticalScroller=YES; scroll.hasHorizontalScroller=YES;
   self.table=[[NSTableView alloc] initWithFrame:scroll.bounds]; self.table.delegate=self; self.table.dataSource=self;
   NSArray* names=@[@"이름",@"원본 크기 (B)",@"압축 크기 (B)",@"수정 날짜",@"암호"];
@@ -165,7 +166,7 @@ static NSString* S(const std::string& s) { return [[NSString alloc] initWithByte
       o.hideNames=o.format=="7z"&&self.hideNames.state==NSControlStateValueOn;
       kz::createArgs(o,"validation",inputs);
     }catch(const std::exception& e){self.status.stringValue=S(e.what());return;}
-    NSSavePanel* panel=[NSSavePanel savePanel]; panel.nameFieldStringValue=S("Archive."+o.format);
+    NSSavePanel* panel=[NSSavePanel savePanel]; auto suggested=kz::suggestedArchive(inputs,o.format);panel.nameFieldStringValue=S(suggested.filename().u8string());panel.directoryURL=[NSURL fileURLWithPath:S(suggested.parent_path().u8string()) isDirectory:YES];
     if([panel runModal]!=NSModalResponseOK)return;
     kz::fs::path output(panel.URL.fileSystemRepresentation); self.password.stringValue=@"";
     [self run:[self,o,output,inputs] {return "압축 완료: "+engine->create(o,output,inputs).u8string();}]; return;

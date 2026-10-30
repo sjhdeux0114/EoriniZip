@@ -23,6 +23,22 @@ void Engine::cancel() {
 }
 std::string Engine::run(const std::vector<std::string>& args) {
   if (cancelled_) throw std::runtime_error("Operation cancelled.");
+  progress_=-1;phase_=args.empty()?0:args[0]=="a"?1:args[0]=="x"?2:args[0]=="t"?3:4;
+  std::string progressLine;
+  auto consume=[&](const char* bytes,size_t count){
+    for(size_t i=0;i<count;++i){
+      char c=bytes[i];
+      if(c=='\r'||c=='\n'||c=='\b'){progressLine.clear();continue;}
+      if(progressLine.size()<16)progressLine+=c;
+      if(c=='%'){
+        size_t start=progressLine.find_first_not_of(' ');
+        if(start==std::string::npos)continue;
+        int n=0;bool valid=true;
+        for(size_t j=start;j+1<progressLine.size();++j){char d=progressLine[j];if(d<'0'||d>'9'){valid=false;break;}n=n*10+d-'0';}
+        if(valid&&n<=100)progress_=n;
+      }
+    }
+  };
   std::string output; bool overflow = false; constexpr size_t cap = 32 * 1024 * 1024;
   int code = -1;
 #ifdef _WIN32
@@ -46,6 +62,8 @@ std::string Engine::run(const std::vector<std::string>& args) {
   CloseHandle(write.value); write.value = nullptr;
   char buffer[8192]; DWORD count;
   while (ReadFile(read.value, buffer, sizeof(buffer), &count, nullptr) && count) {
+    consume(buffer,count);
+    if(args[0]!="l"&&output.size()>65536)output.erase(0,output.size()-32768);
     if (output.size() + count > cap) { overflow = true; cancel(); break; }
     output.append(buffer, count);
   }
@@ -72,6 +90,8 @@ std::string Engine::run(const std::vector<std::string>& args) {
   char buffer[8192]; ssize_t count;
   while ((count = read(pipes[0], buffer, sizeof(buffer))) != 0) {
     if (count < 0) { if (errno == EINTR) continue; break; }
+    consume(buffer,static_cast<size_t>(count));
+    if(args[0]!="l"&&output.size()>65536)output.erase(0,output.size()-32768);
     if (output.size() + static_cast<size_t>(count) > cap) { overflow = true; cancel(); break; }
     output.append(buffer, static_cast<size_t>(count));
   }
@@ -83,6 +103,6 @@ std::string Engine::run(const std::vector<std::string>& args) {
   if (overflow) throw std::runtime_error("Engine output exceeded safety limit.");
   if (cancelled_) throw std::runtime_error("Operation cancelled.");
   if (code != 0) throw std::runtime_error("7-Zip error " + std::to_string(code) + ". Check password, format and archive integrity.");
-  return output;
+  progress_=100;return output;
 }
 }
