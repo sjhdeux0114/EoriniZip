@@ -1,8 +1,18 @@
 #import <Cocoa/Cocoa.h>
 #include "core.hpp"
+#include "split_presets.hpp"
 #include <memory>
 #include <functional>
 static NSString* S(const std::string& s) { return [[NSString alloc] initWithBytes:s.data() length:s.size() encoding:NSUTF8StringEncoding] ?: @"Invalid UTF-8"; }
+@interface YellowHomeView : NSView
+@end
+@implementation YellowHomeView
+- (void)drawRect:(NSRect)rect {
+  (void)rect;
+  NSGradient* gradient=[[NSGradient alloc] initWithStartingColor:[NSColor colorWithSRGBRed:1 green:0.902 blue:0.51 alpha:1] endingColor:[NSColor colorWithSRGBRed:0.941 green:0.702 blue:0.082 alpha:1]];
+  [gradient drawInRect:self.bounds angle:270];
+}
+@end
 @interface AppDelegate : NSObject <NSApplicationDelegate, NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate> {
   std::unique_ptr<kz::Engine> engine;
   std::vector<kz::Entry> entries;
@@ -15,6 +25,8 @@ static NSString* S(const std::string& s) { return [[NSString alloc] initWithByte
 @property NSTextField* location;
 @property NSSecureTextField* password;
 @property NSTextField* split;
+@property NSPopUpButton* splitPreset;
+@property NSView* home;
 @property NSPopUpButton* format;
 @property NSButton* hideNames;
 @property NSMutableArray<NSControl*>* controls;
@@ -42,9 +54,14 @@ static NSString* S(const std::string& s) { return [[NSString alloc] initWithByte
   [self label:@"비밀번호" frame:NSMakeRect(164,510,70,24)];
   self.password=[[NSSecureTextField alloc] initWithFrame:NSMakeRect(235,508,180,28)]; [self.window.contentView addSubview:self.password];
   [self label:@"분할" frame:NSMakeRect(435,510,40,24)];
-  self.split=[[NSTextField alloc] initWithFrame:NSMakeRect(480,508,110,28)]; self.split.placeholderString=@"예: 100m"; [self.window.contentView addSubview:self.split];
-  self.hideNames=[NSButton checkboxWithTitle:@"파일명 암호화 (7Z)" target:nil action:nil]; self.hideNames.frame=NSMakeRect(610,508,220,28); [self.window.contentView addSubview:self.hideNames];
-  [self.controls addObjectsFromArray:@[self.format,self.password,self.split,self.hideNames]];
+  self.splitPreset=[[NSPopUpButton alloc] initWithFrame:NSMakeRect(475,508,210,28) pullsDown:NO];
+  for(const auto& preset:kz::splitPresets)[self.splitPreset addItemWithTitle:S(preset.label)];
+  self.splitPreset.target=self;self.splitPreset.action=@selector(optionsChanged:);
+  [self.window.contentView addSubview:self.splitPreset];
+  self.format.target=self;self.format.action=@selector(optionsChanged:);
+  self.split=[[NSTextField alloc] initWithFrame:NSMakeRect(690,508,100,28)]; self.split.placeholderString=@"예: 100m"; [self.window.contentView addSubview:self.split];
+  self.hideNames=[NSButton checkboxWithTitle:@"파일명 암호화 (7Z)" target:nil action:nil]; self.hideNames.frame=NSMakeRect(800,508,220,28); [self.window.contentView addSubview:self.hideNames];
+  [self.controls addObjectsFromArray:@[self.format,self.password,self.split,self.splitPreset,self.hideNames]];
   self.location=[self label:@"압축파일을 열거나 새로 압축하세요. 결과는 새 어린이zip 폴더에 저장됩니다." frame:NSMakeRect(20,468,990,28)];
   NSScrollView* scroll=[[NSScrollView alloc] initWithFrame:NSMakeRect(20,65,1000,390)]; scroll.hasVerticalScroller=YES; scroll.hasHorizontalScroller=YES;
   self.table=[[NSTableView alloc] initWithFrame:scroll.bounds]; self.table.delegate=self; self.table.dataSource=self;
@@ -54,7 +71,32 @@ static NSString* S(const std::string& s) { return [[NSString alloc] initWithByte
   self.status=[self label:@"준비 · 공식 7zz 실행 파일을 연결하세요." frame:NSMakeRect(20,12,1000,42)];
   for (const auto& candidate : {kz::fs::path("/opt/homebrew/bin/7zz"),kz::fs::path("/usr/local/bin/7zz")})
     if(kz::fs::exists(candidate)){engine=std::make_unique<kz::Engine>(candidate); self.status.stringValue=@"준비 · 7-Zip 연결됨"; break;}
+  self.home=[[YellowHomeView alloc] initWithFrame:NSMakeRect(0,60,1040,620)];
+  self.home.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;
+  [self.window.contentView addSubview:self.home];
+  NSImageView* homeLogo=[[NSImageView alloc] initWithFrame:NSMakeRect(20,536,60,60)];
+  homeLogo.image=NSApp.applicationIconImage;homeLogo.autoresizingMask=NSViewMinYMargin;[self.home addSubview:homeLogo];
+  for(NSInteger i=0;i<2;++i){
+    NSButton* button=[NSButton buttonWithTitle:i==0?@"압축 파일 열기":@"새로 압축하기" target:self action:@selector(action:)];
+    button.tag=i;button.frame=NSMakeRect(358+i*164,245,160,130);
+    button.bezelStyle=NSBezelStyleRegularSquare;
+    button.autoresizingMask=NSViewMinXMargin|NSViewMaxXMargin|NSViewMinYMargin|NSViewMaxYMargin;
+    [self.home addSubview:button];[self.controls addObject:button];
+  }
+  NSMenuItem* viewItem=[[NSMenuItem alloc] initWithTitle:@"보기" action:nil keyEquivalent:@""];
+  NSMenu* viewMenu=[[NSMenu alloc] initWithTitle:@"보기"];
+  NSMenuItem* homeItem=[[NSMenuItem alloc] initWithTitle:@"시작 화면" action:@selector(showHome:) keyEquivalent:@"h"];
+  homeItem.target=self;[viewMenu addItem:homeItem];viewItem.submenu=viewMenu;[NSApp.mainMenu addItem:viewItem];
+  [self optionsChanged:nil];
   [self.window center]; [self.window makeKeyAndOrderFront:nil]; [NSApp activateIgnoringOtherApps:YES];
+}
+- (void)showHome:(id)sender { (void)sender; if(!busy)self.home.hidden=!self.home.hidden; }
+- (void)optionsChanged:(id)sender {
+  (void)sender;
+  BOOL tar=self.format.indexOfSelectedItem==2,seven=self.format.indexOfSelectedItem==1;
+  self.splitPreset.enabled=!busy&&!tar;
+  self.split.enabled=!busy&&!tar&&self.splitPreset.indexOfSelectedItem==(NSInteger)kz::customSplitIndex;
+  self.hideNames.enabled=!busy&&seven;if(!seven)self.hideNames.state=NSControlStateValueOff;
 }
 - (NSInteger)numberOfRowsInTableView:(NSTableView*)tableView { (void)tableView; return entries.size(); }
 - (id)tableView:(NSTableView*)view objectValueForTableColumn:(NSTableColumn*)column row:(NSInteger)row {
@@ -75,11 +117,12 @@ static NSString* S(const std::string& s) { return [[NSString alloc] initWithByte
   dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED,0), ^{
     std::string message; try { message=operation(); } catch(const std::exception& e) { message=e.what(); }
     NSString* result=S(message);
-    dispatch_async(dispatch_get_main_queue(), ^{ busy=NO; for(NSControl* control in self.controls) control.enabled=YES; self.status.stringValue=result; });
+    dispatch_async(dispatch_get_main_queue(), ^{ busy=NO; for(NSControl* control in self.controls) control.enabled=YES; self.status.stringValue=result; [self optionsChanged:nil]; });
   });
 }
 - (void)reloadArchive {
   if(archive.empty())return;
+  self.home.hidden=YES;
   const auto file=archive; const std::string secret=self.password.stringValue.UTF8String;
   [self run:[self,file,secret] {
     auto data=std::make_shared<std::vector<kz::Entry>>(engine->list(file,secret));
@@ -97,8 +140,31 @@ static NSString* S(const std::string& s) { return [[NSString alloc] initWithByte
   }
   if(action==7) { [self reloadArchive]; return; }
   if(action==1 || action==2) {
+    NSAlert* options=[NSAlert new];options.messageText=@"새로 압축하기";options.informativeText=@"압축 형식과 분할 크기를 선택하세요.";
+    [options addButtonWithTitle:@"파일 선택"];[options addButtonWithTitle:@"취소"];
+    NSView* form=[[NSView alloc] initWithFrame:NSMakeRect(0,0,420,210)];
+    NSArray* labels=@[@"압축 형식",@"분할 압축",@"직접 입력",@"비밀번호"];
+    for(NSInteger i=0;i<4;++i){NSTextField* label=[NSTextField labelWithString:labels[i]];label.frame=NSMakeRect(0,180-i*38,85,22);[form addSubview:label];}
+    NSPopUpButton* format=[[NSPopUpButton alloc] initWithFrame:NSMakeRect(90,178,320,28) pullsDown:NO];[format addItemsWithTitles:@[@"zip",@"7z",@"tar"]];
+    [format selectItemAtIndex:self.format.indexOfSelectedItem];[form addSubview:format];
+    NSPopUpButton* presets=[[NSPopUpButton alloc] initWithFrame:NSMakeRect(90,140,320,28) pullsDown:NO];
+    for(const auto& preset:kz::splitPresets)[presets addItemWithTitle:S(preset.label)];
+    [presets selectItemAtIndex:self.splitPreset.indexOfSelectedItem];[form addSubview:presets];
+    NSTextField* custom=[[NSTextField alloc] initWithFrame:NSMakeRect(90,104,320,24)];custom.placeholderString=@"직접 입력 선택 시 사용: 100m, 2g";custom.stringValue=self.split.stringValue;[form addSubview:custom];
+    NSSecureTextField* secretField=[[NSSecureTextField alloc] initWithFrame:NSMakeRect(90,66,320,24)];[form addSubview:secretField];
+    NSButton* encryptNames=[NSButton checkboxWithTitle:@"파일명 암호화 (7Z)" target:nil action:nil];encryptNames.frame=NSMakeRect(90,25,320,24);[form addSubview:encryptNames];
+    options.accessoryView=form;
+    if([options runModal]!=NSAlertFirstButtonReturn)return;
+    [self.format selectItemAtIndex:format.indexOfSelectedItem];[self.splitPreset selectItemAtIndex:presets.indexOfSelectedItem];
+    self.split.stringValue=custom.stringValue;self.password.stringValue=secretField.stringValue;secretField.stringValue=@"";
+    self.hideNames.state=encryptNames.state;[self optionsChanged:nil];self.home.hidden=YES;
     auto inputs=[self chooseFolder:action==2 multiple:action==1]; if(inputs.empty())return;
-    kz::Options o; o.format=self.format.titleOfSelectedItem.UTF8String; o.password=self.password.stringValue.UTF8String; o.split=self.split.stringValue.UTF8String; o.hideNames=self.hideNames.state==NSControlStateValueOn;
+    kz::Options o; o.format=self.format.titleOfSelectedItem.UTF8String; o.password=self.password.stringValue.UTF8String; try {
+      if(o.format!="tar")o.split=kz::splitArgument(static_cast<size_t>(self.splitPreset.indexOfSelectedItem),self.split.stringValue.UTF8String);
+      if(o.format=="tar")o.password.clear();
+      o.hideNames=o.format=="7z"&&self.hideNames.state==NSControlStateValueOn;
+      kz::createArgs(o,"validation",inputs);
+    }catch(const std::exception& e){self.status.stringValue=S(e.what());return;}
     NSSavePanel* panel=[NSSavePanel savePanel]; panel.nameFieldStringValue=S("Archive."+o.format);
     if([panel runModal]!=NSModalResponseOK)return;
     kz::fs::path output(panel.URL.fileSystemRepresentation); self.password.stringValue=@"";

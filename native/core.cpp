@@ -28,7 +28,7 @@ std::vector<std::string> createArgs(const Options& o, const fs::path& output, co
   if (o.format != "zip" && o.format != "7z" && o.format != "tar") throw std::runtime_error("Unsupported creation format.");
   if (o.level < 0 || o.level > 9 || inputs.empty()) throw std::runtime_error("Choose input files and a valid compression level.");
   passwordCheck(o.password);
-  if (!o.split.empty() && !std::regex_match(o.split, std::regex("[1-9][0-9]{0,6}[kKmMgG]"))) throw std::runtime_error("Split size must look like 100m or 2g.");
+  if (!o.split.empty() && !std::regex_match(o.split, std::regex("[1-9][0-9]{0,12}[bBkKmMgG]"))) throw std::runtime_error("Split size must look like 100m or 2g.");
   if (o.format == "tar" && (!o.password.empty() || !o.split.empty() || o.hideNames)) throw std::runtime_error("TAR does not support encryption/split options.");
   if (o.hideNames && (o.format != "7z" || o.password.empty())) throw std::runtime_error("Filename encryption requires 7Z and a password.");
   std::vector<std::string> args = {"a", "-t" + o.format, "-mx=" + std::to_string(o.level), "-bd", "-y", "-sccUTF-8", "-spd"};

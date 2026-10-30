@@ -1,4 +1,5 @@
 #include "core.hpp"
+#include "split_presets.hpp"
 #include <iostream>
 #include <fstream>
 #include <random>
@@ -22,6 +23,19 @@ int main(int argc,char** argv) {
     a.link=true; rejects([&]{kz::validateEntries({a});});
     check(kz::quoteWindows(L"a b\\")==L"\"a b\\\\\"","Windows trailing slash quoting");
     check(kz::quoteWindows(L"a\"b")==L"\"a\\\"b\"","Windows quote escaping");
+    check(kz::splitArgument(0).empty(),"No splitting preset");
+    check(kz::splitArgument(18)=="4294967295b","FAT32 maximum file size");
+    check(kz::splitArgument(kz::customSplitIndex,"2g")=="2g","Custom split");
+    rejects([]{kz::splitArgument(kz::customSplitIndex);});
+    rejects([]{kz::splitArgument(100);});
+    for(size_t i=1;i<kz::customSplitIndex;++i) {
+      kz::Options preset; preset.split=kz::splitArgument(i);
+      kz::createArgs(preset,"out.zip",{"input"});
+    }
+    for(auto invalid:{"0m","-1m","1.5g","10m -y","99999999999999g"}) {
+      kz::Options invalidOptions;invalidOptions.split=invalid;
+      rejects([&]{kz::createArgs(invalidOptions,"out.zip",{"input"});});
+    }
     std::cout<<"Core unit checks passed\n";
     if(argc<2) {std::cout<<"Integration SKIPPED: supply full 7-Zip executable path\n"; return 0;}
     auto root=kz::fs::temp_directory_path()/("eorinizip-native-test-"+std::to_string(std::random_device{}()));
@@ -48,6 +62,20 @@ int main(int argc,char** argv) {
       kz::Options split;split.format="7z";split.split="10k";
       auto destination=engine.create(split,root/"parts.7z",{randomFile});
       check(kz::fs::exists(destination/"parts.7z.002"),"Split volumes missing"); engine.test(destination/"parts.7z.001");
+      auto large=root/"preset.bin";
+      {std::ofstream f(large,std::ios::binary); std::mt19937 gen(43);
+       std::string block(65536,'\0');for(int i=0;i<100;++i){for(auto& c:block)c=static_cast<char>(gen());f.write(block.data(),block.size());}}
+      for(auto format:{"zip","7z"}) {
+        kz::Options preset;preset.format=format;preset.level=0;preset.split=kz::splitArgument(1);
+        const auto base=std::string("preset.")+format;
+        auto dest=engine.create(preset,root/base,{large});
+        check(kz::fs::file_size(dest/(base+".001"))==5ULL*1024*1024,"5MB preset first volume size");
+        check(kz::fs::exists(dest/(base+".002")),"Preset second volume");
+        engine.test(dest/(base+".001"));
+        auto unpacked=engine.extract(dest/(base+".001"),root);
+        std::ifstream original(large,std::ios::binary),roundtrip(unpacked/large.filename(),std::ios::binary);
+        check(std::string(std::istreambuf_iterator<char>(original),{})==std::string(std::istreambuf_iterator<char>(roundtrip),{}),"Preset split roundtrip");
+      }
       engine.cancel();rejects([&]{engine.list(destination/"parts.7z.001");});engine.resetCancel();
       engine.test(destination/"parts.7z.001");
       std::cout<<"ZIP/7Z/TAR + password + split + no-overwrite + cancellation checks passed\n";

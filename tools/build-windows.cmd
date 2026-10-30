@@ -14,7 +14,7 @@ if defined KZ_SDK_BIN set "PATH=%KZ_SDK_BIN%;%PATH%"
 if not exist build mkdir build
 rc /nologo /I native /fo build\windows.res native\windows.rc
 if errorlevel 1 exit /b 1
-cl /nologo /std:c++17 /utf-8 /EHsc /W4 /O2 /MT /DUNICODE /D_UNICODE /DNOMINMAX /I native native\core.cpp native\process.cpp native\windows.cpp build\windows.res /Fo:build\ /Fe:build\EoriniZip.exe /link /SUBSYSTEM:WINDOWS comctl32.lib ole32.lib shell32.lib uuid.lib user32.lib gdi32.lib
+cl /nologo /std:c++17 /utf-8 /EHsc /W4 /O2 /MT /DUNICODE /D_UNICODE /DNOMINMAX /I native native\core.cpp native\process.cpp native\windows.cpp build\windows.res /Fo:build\ /Fe:build\EoriniZip.exe /link /SUBSYSTEM:WINDOWS comctl32.lib ole32.lib shell32.lib uuid.lib user32.lib gdi32.lib msimg32.lib advapi32.lib
 if errorlevel 1 exit /b 1
 cl /nologo /std:c++17 /utf-8 /EHsc /W4 /O2 /MT /DUNICODE /D_UNICODE /DNOMINMAX /I native native\core.cpp native\process.cpp tests\core_tests.cpp /Fo:build\ /Fe:build\core_tests.exe
 if errorlevel 1 exit /b 1
