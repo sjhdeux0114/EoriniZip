@@ -2,7 +2,7 @@
 
 # 어린이zip · EoriniZip 0.5
 
-Windows Win32 / macOS AppKit와 C++17 공통 코어로 만드는 무료 압축 프로그램입니다. Electron이나 WebView를 사용하지 않습니다. 반디집과 무관한 독립 프로젝트입니다.
+Windows Win32 / macOS AppKit와 C++17 공통 코어로 만드는 무료 압축 프로그램입니다. 
 
 **0.5 개발 릴리즈입니다. 아래 미완료 항목이 있어 모든 기능이 완성된 버전으로 표시하지 않습니다.**
 
