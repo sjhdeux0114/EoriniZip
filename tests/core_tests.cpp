@@ -111,7 +111,10 @@ int main(int argc,char** argv) {
         rejects([&]{engine.repairZip(corrupt,root);});check(!kz::fs::exists(root/"repair-corrupt-recovered.zip"),"CRC failure does not publish recovered ZIP");
       }
       {
-        auto macInput=root/kz::fs::u8path(decomposed+".txt");{std::ofstream f(macInput);f<<"macOS name";}
+        // APFS/HFS+ resolve NFC and NFD spellings to the same file. Keep this
+        // fixture separate so it cannot overwrite the main roundtrip input.
+        auto macSource=root/"nfd-source";kz::fs::create_directory(macSource);
+        auto macInput=macSource/kz::fs::u8path(decomposed+".txt");{std::ofstream f(macInput);f<<"macOS name";}
         kz::Options options;
         auto macArchive=engine.create(options,root/"mac-nfd.zip",{macInput});
         auto macEntries=engine.list(macArchive);check(macEntries.size()==1,"NFD archive listing");
