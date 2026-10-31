@@ -2,7 +2,7 @@
 
 # 어린이zip · EoriniZip 0.5.1
 
-Windows Win32 / macOS AppKit와 C++17 공통 코어로 만드는 무료 압축 프로그램입니다. Electron이나 WebView를 사용하지 않으며 반디집과 무관한 독립 프로젝트입니다.
+Windows Win32 / macOS AppKit와 C++17 공통 코어로 만드는 무료 압축 프로그램입니다. 
 
 **0.5.1 개발 릴리즈입니다. Windows 11 첫 메뉴와 macOS 한글 파일명 처리를 보완했습니다. 로컬 테스트 인증서로 서명했으며 공인 서명·Mac 공증을 마친 일반 배포 버전은 아닙니다.**
 
@@ -68,25 +68,5 @@ macOS에는 Xcode Command Line Tools, Rust와 전체 7zz가 필요합니다. Git
 
 현재 빌드는 `EoriniZip-test-signing.cer`의 로컬 인증서를 사용합니다. 이 PC에서는 사용자 승인으로 이 인증서만 컴퓨터의 TrustedPeople에 등록하여 첫 메뉴를 검증했습니다. 다른 PC는 기본적으로 신뢰하지 않습니다. 테스트 인증서를 신뢰하기로 명시적으로 결정한 경우에만 관리자 PowerShell에서 아래 명령을 실행한 뒤 설치하세요. 신뢰를 추가하지 않으면 클래식 메뉴를 사용할 수 있으며 첫 메뉴 등록 실패를 안내합니다.
 
-```powershell
-Import-Certificate -FilePath .\EoriniZip-test-signing.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople
-```
+`THIRD_PARTY_NOTICES.txt`와 각 `third_party` 하위 라이선스를 확인하세요. ALZ/EGG는 MIT 구현, EasyCrypt는 MIT easycrab 기반, ZPAQ는 public-domain/Unlicense와 MIT 부분을 사용합니다. 배포 패키지에 Rust 의존성 고지와 7-Zip 라이선스를 포함합니다. 프로젝트 자체 재사용 라이선스는 아직 지정하지 않았습니다.
 
-설치 폴더에서 진단·재등록:
-
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows11-menu.ps1 -Action Status
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\windows11-menu.ps1 -Action InstallSigned
-```
-
-메뉴를 새로 열어 확인하고 필요하면 로그아웃 후 로그인합니다. 설치 파일은 `dist/EoriniZip-0.5.1-windows-x64-setup.exe`입니다.
-
-## 제한과 라이선스
-
-- 경로 탈출·예약 이름·링크·중복 이름 검사. 항목 100,000개 / 선언된 해제 크기 20 GiB 한도. OS 샌드박스를 대신하지 않습니다.
-- ZIP 분할은 `.001/.002` 방식이며 `.z01` 생성은 지원하지 않습니다. 모든 외부 분할 변형을 보장하지 않습니다.
-- 암호는 코덱 CLI 인수에 전달되어 로컬 프로세스 검사에서 보일 수 있습니다. 전용 API/IPC 전환은 남아 있습니다.
-- 임의 손상 데이터 복원, 후보에 없는 암호 찾기, 부팅 ISO, Mac UI 동등성, 공인 서명·공증, ARM64/PE 실기기 검증은 완료하지 않았습니다. 모든 기능·플랫폼 검증이 끝난 버전으로 표시하지 않습니다.
-- RustSec/업스트림 감시와 Dependabot을 구성했습니다. 알려지지 않은 취약점 부재를 보장하지 않습니다.
-
-`THIRD_PARTY_NOTICES.txt`와 각 `third_party` 라이선스를 확인하세요. ALZ/EGG는 MIT, EasyCrypt는 MIT easycrab 기반, ZPAQ는 public-domain/Unlicense 및 MIT 부분을 사용합니다. 패키지에 Rust 의존성 고지와 7-Zip 라이선스·소스를 포함합니다. 프로젝트 자체 재사용 라이선스는 아직 지정하지 않았습니다.
