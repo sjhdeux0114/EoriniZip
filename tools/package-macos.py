@@ -95,7 +95,10 @@ def package(build, engine, destination, arch):
             linked = run("otool", "-L", binary, capture_output=True, text=True).stdout
             if any(path in linked for path in ("/opt/homebrew/", "/usr/local/", "/Users/runner/")):
                 raise RuntimeError(f"Nonportable dynamic library reference: {binary.name}")
-            run("codesign", "--force", "--sign", "-", binary)
+            # Signing the main executable can sign/validate the enclosing bundle.
+            # Intel linker output has unsigned helpers, so sign those first.
+            if binary.name != "EoriniZip":
+                run("codesign", "--force", "--sign", "-", binary)
         run("codesign", "--force", "--sign", "-", app)
         run("codesign", "--verify", "--deep", "--strict", "--verbose=2", app)
         # Test the actual packaged engine/codecs from a disposable bundle copy.
