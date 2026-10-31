@@ -38,6 +38,8 @@ namespace {
 HWND progressWindow=nullptr, tree=nullptr;
 HWND window, list, statusText, pathText, password, passwordLabel, logo, homeOpen, homeCreate;
 HFONT font;
+HIMAGELIST entryImages=nullptr;
+int folderIcon=-1,fileIcon=-1;
 HBRUSH footerBrush;
 std::vector<HWND> workspace, controls;
 std::unique_ptr<kz::Engine> engine;
@@ -289,8 +291,9 @@ void displayFolder(const std::string& folder) {
   SendMessageW(list,WM_SETREDRAW,FALSE,0);ListView_DeleteAllItems(list);
   for(size_t i=0;i<visibleEntries.size();++i){
     const auto& e=visibleEntries[i];auto name=e.name.substr(prefix.size());
-    std::wstring values[]={kz::widen((e.directory?"[폴더] ":"")+kz::composeFilename(name)),e.directory?L"":std::to_wstring(e.size),e.directory?L"":std::to_wstring(e.packed),kz::widen(e.modified),e.encrypted?L"암호":L""};
-    LVITEMW item{};item.mask=LVIF_TEXT;item.iItem=static_cast<int>(i);item.pszText=values[0].data();ListView_InsertItem(list,&item);
+    std::wstring values[]={kz::widen(kz::composeFilename(name)),e.directory?L"":std::to_wstring(e.size),e.directory?L"":std::to_wstring(e.packed),kz::widen(e.modified),e.encrypted?L"암호":L""};
+    LVITEMW item{};item.mask=LVIF_TEXT;item.iImage=e.directory?folderIcon:fileIcon;if(item.iImage>=0)item.mask|=LVIF_IMAGE;
+    item.iItem=static_cast<int>(i);item.pszText=values[0].data();ListView_InsertItem(list,&item);
     for(int j=1;j<5;++j)ListView_SetItemText(list,static_cast<int>(i),j,values[j].data());
   }
   SendMessageW(list,WM_SETREDRAW,TRUE,0);InvalidateRect(list,nullptr,TRUE);
@@ -300,6 +303,8 @@ void display(const std::vector<kz::Entry>& entries) {
   auto insert=[&](const std::string& path,const std::wstring& label,HTREEITEM parent){
     TVINSERTSTRUCTW item{};item.hParent=parent;item.hInsertAfter=TVI_LAST;item.item.mask=TVIF_TEXT|TVIF_PARAM;
     item.item.pszText=const_cast<wchar_t*>(label.c_str());item.item.lParam=static_cast<LPARAM>(treePaths.size());treePaths.push_back(path);
+    item.item.iImage=item.item.iSelectedImage=path.empty()?fileIcon:folderIcon;
+    if(item.item.iImage>=0)item.item.mask|=TVIF_IMAGE|TVIF_SELECTEDIMAGE;
     auto handle=TreeView_InsertItem(tree,&item);treeItems[path]=handle;return handle;
   };
   auto root=insert("",archive.filename().wstring(),TVI_ROOT);
@@ -915,7 +920,15 @@ LRESULT CALLBACK procedure(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp) {
       password=control(L"EDIT",L"",WS_BORDER|ES_PASSWORD|ES_AUTOHSCROLL|WS_TABSTOP);
       SendMessageW(password,EM_SETCUEBANNER,TRUE,reinterpret_cast<LPARAM>(L"입력 후 다시 읽기"));
       tree=control(WC_TREEVIEWW,L"",TVS_HASBUTTONS|TVS_HASLINES|TVS_LINESATROOT|TVS_SHOWSELALWAYS|WS_BORDER|WS_TABSTOP);
-      list=control(WC_LISTVIEWW,L"",LVS_REPORT|LVS_SHOWSELALWAYS|WS_BORDER|WS_TABSTOP);
+      list=control(WC_LISTVIEWW,L"",LVS_REPORT|LVS_SHOWSELALWAYS|LVS_SHAREIMAGELISTS|WS_BORDER|WS_TABSTOP);
+      entryImages=ImageList_Create(px(16),px(16),ILC_COLOR32|ILC_MASK,2,0);
+      if(entryImages){
+        const SHSTOCKICONID stockIcons[]={SIID_FOLDER,SIID_DOCNOASSOC};int* indexes[]={&folderIcon,&fileIcon};
+        for(int i=0;i<2;++i){SHSTOCKICONINFO info{};info.cbSize=sizeof(info);
+          if(SUCCEEDED(SHGetStockIconInfo(stockIcons[i],SHGSI_ICON|SHGSI_SMALLICON,&info))){*indexes[i]=ImageList_AddIcon(entryImages,info.hIcon);DestroyIcon(info.hIcon);}
+        }
+        ListView_SetImageList(list,entryImages,LVSIL_SMALL);TreeView_SetImageList(tree,entryImages,TVSIL_NORMAL);
+      }
       ListView_SetExtendedListViewStyle(list,LVS_EX_DOUBLEBUFFER|(preferences.fullRow?LVS_EX_FULLROWSELECT:0)|(preferences.grid?LVS_EX_GRIDLINES:0));
       const wchar_t* columns[]={L"이름",L"원본 크기 (B)",L"압축 크기 (B)",L"수정 날짜",L"암호"};int widths[]={280,120,120,170,60};
       for(int i=0;i<5;++i){auto label=kz::ui::label(columns[i]);LVCOLUMNW c{};c.mask=LVCF_TEXT|LVCF_WIDTH;c.pszText=label.data();c.cx=px(widths[i]);ListView_InsertColumn(list,i,&c);}
@@ -1060,7 +1073,7 @@ LRESULT CALLBACK procedure(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp) {
     }
     case WM_GETMINMAXINFO:{auto info=reinterpret_cast<MINMAXINFO*>(lp);info->ptMinTrackSize={px(730),px(460)};return 0;}
     case WM_CLOSE:if(busy){MessageBoxW(hwnd,L"작업을 취소한 뒤 창을 닫아 주세요.",L"어린이zip",MB_OK);return 0;}DestroyWindow(hwnd);return 0;
-    case WM_DESTROY:if(worker.joinable())worker.join();if(GetClipboardOwner()==window&&OpenClipboard(window)){EmptyClipboard();CloseClipboard();}for(const auto& root:clipboardRoots){std::error_code ec;kz::fs::remove_all(root,ec);}DeleteObject(font);DeleteObject(footerBrush);PostQuitMessage(0);return 0;
+    case WM_DESTROY:if(worker.joinable())worker.join();if(GetClipboardOwner()==window&&OpenClipboard(window)){EmptyClipboard();CloseClipboard();}for(const auto& root:clipboardRoots){std::error_code ec;kz::fs::remove_all(root,ec);}if(entryImages){ListView_SetImageList(list,nullptr,LVSIL_SMALL);TreeView_SetImageList(tree,nullptr,TVSIL_NORMAL);ImageList_Destroy(entryImages);entryImages=nullptr;}DeleteObject(font);DeleteObject(footerBrush);PostQuitMessage(0);return 0;
   }
   return DefWindowProcW(hwnd,msg,wp,lp);
 }

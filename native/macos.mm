@@ -66,6 +66,8 @@ static NSString* S(const std::string& s) { return [[[NSString alloc] initWithByt
   self.location=[self label:@"압축파일을 열거나 새로 압축하세요. 결과는 지정한 위치에 저장됩니다." frame:NSMakeRect(20,468,990,28)];
   NSScrollView* scroll=[[NSScrollView alloc] initWithFrame:NSMakeRect(20,65,1000,390)]; scroll.hasVerticalScroller=YES; scroll.hasHorizontalScroller=YES;
   self.table=[[NSTableView alloc] initWithFrame:scroll.bounds]; self.table.delegate=self; self.table.dataSource=self;
+  NSTableColumn* iconColumn=[[NSTableColumn alloc] initWithIdentifier:@"icon"];iconColumn.title=@"";iconColumn.width=24;iconColumn.minWidth=24;iconColumn.maxWidth=24;
+  NSImageCell* iconCell=[NSImageCell new];iconCell.imageScaling=NSImageScaleProportionallyDown;iconColumn.dataCell=iconCell;[self.table addTableColumn:iconColumn];
   NSArray* names=@[@"이름",@"원본 크기 (B)",@"압축 크기 (B)",@"수정 날짜",@"암호"];
   for(NSInteger i=0;i<5;i++) { NSTableColumn* column=[[NSTableColumn alloc] initWithIdentifier:[NSString stringWithFormat:@"%ld",(long)i]]; column.title=names[i]; column.width=i==0?380:(i==3?190:130); [self.table addTableColumn:column]; }
   scroll.documentView=self.table; [self.window.contentView addSubview:scroll];
@@ -103,6 +105,7 @@ static NSString* S(const std::string& s) { return [[[NSString alloc] initWithByt
 - (NSInteger)numberOfRowsInTableView:(NSTableView*)tableView { (void)tableView; return entries.size(); }
 - (id)tableView:(NSTableView*)view objectValueForTableColumn:(NSTableColumn*)column row:(NSInteger)row {
   (void)view; const auto& e=entries.at(row);
+  if([column.identifier isEqualToString:@"icon"])return [NSImage imageNamed:e.directory?NSImageNameFolder:NSImageNameMultipleDocuments];
   switch(column.identifier.integerValue) { case 0:return S(e.name); case 1:return @(e.size); case 2:return @(e.packed); case 3:return S(e.modified); default:return e.encrypted?@"암호":@""; }
 }
 - (std::vector<kz::fs::path>)chooseFolder:(BOOL)folder multiple:(BOOL)multiple {
