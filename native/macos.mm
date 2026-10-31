@@ -70,7 +70,8 @@ static NSString* S(const std::string& s) { return [[[NSString alloc] initWithByt
   for(NSInteger i=0;i<5;i++) { NSTableColumn* column=[[NSTableColumn alloc] initWithIdentifier:[NSString stringWithFormat:@"%ld",(long)i]]; column.title=names[i]; column.width=i==0?380:(i==3?190:130); [self.table addTableColumn:column]; }
   scroll.documentView=self.table; [self.window.contentView addSubview:scroll];
   self.status=[self label:@"준비 · 공식 7zz 실행 파일을 연결하세요." frame:NSMakeRect(20,12,1000,42)];
-  for (const auto& candidate : {kz::fs::path("/opt/homebrew/bin/7zz"),kz::fs::path("/usr/local/bin/7zz")})
+  auto bundledEngine=kz::fs::path(NSBundle.mainBundle.executablePath.fileSystemRepresentation).parent_path()/"7zz";
+  for (const auto& candidate : {bundledEngine,kz::fs::path("/opt/homebrew/bin/7zz"),kz::fs::path("/usr/local/bin/7zz")})
     if(kz::fs::exists(candidate)){engine=std::make_unique<kz::Engine>(candidate); self.status.stringValue=@"준비 · 7-Zip 연결됨"; break;}
   self.home=[[YellowHomeView alloc] initWithFrame:NSMakeRect(0,60,1040,620)];
   self.home.autoresizingMask=NSViewWidthSizable|NSViewHeightSizable;

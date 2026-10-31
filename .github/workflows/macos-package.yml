@@ -1,0 +1,51 @@
+name: macOS packages
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/macos-package.yml'
+      - 'CMakeLists.txt'
+      - 'native/**'
+      - 'packaging/macos/**'
+      - 'tools/package-macos.py'
+      - 'third_party/**'
+      - 'tests/**'
+permissions:
+  contents: read
+jobs:
+  package:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            arch: arm64
+          - runner: macos-15-intel
+            arch: x86_64
+    runs-on: ${{ matrix.runner }}
+    env:
+      MACOSX_DEPLOYMENT_TARGET: '13.0'
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal && rustup default stable
+      - name: Prepare full 7-Zip and source notices
+        run: |
+          mkdir -p vendor/7zip
+          curl -fL https://github.com/ip7z/7zip/releases/download/26.05/7z2605-mac.tar.xz -o vendor/7zip.tar.xz
+          tar -xf vendor/7zip.tar.xz -C vendor/7zip
+          curl -fL https://github.com/ip7z/7zip/releases/download/26.05/7z2605-src.tar.xz -o vendor/7zip/7z2605-src.tar.xz
+          chmod +x vendor/7zip/7zz
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
+      - run: cmake --build build --config Release --parallel 3
+      - run: ctest --test-dir build -C Release --output-on-failure
+      - name: Package and verify bundled engine
+        run: python3 tools/package-macos.py --arch '${{ matrix.arch }}'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EoriniZip-0.5.1-macos-${{ matrix.arch }}
+          path: |
+            dist/*.dmg
+            dist/*.zip
+            dist/SHA256SUMS*.txt
+          if-no-files-found: error

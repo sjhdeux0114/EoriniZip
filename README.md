@@ -70,3 +70,21 @@ macOS에는 Xcode Command Line Tools, Rust와 전체 7zz가 필요합니다. Git
 
 `THIRD_PARTY_NOTICES.txt`와 각 `third_party` 하위 라이선스를 확인하세요. ALZ/EGG는 MIT 구현, EasyCrypt는 MIT easycrab 기반, ZPAQ는 public-domain/Unlicense와 MIT 부분을 사용합니다. 배포 패키지에 Rust 의존성 고지와 7-Zip 라이선스를 포함합니다. 프로젝트 자체 재사용 라이선스는 아직 지정하지 않았습니다.
 
+
+## Mac 앱 패키지
+
+macOS 13 이상용 Apple Silicon(arm64)과 Intel(x86_64) 패키지를 각각 빌드합니다. `EoriniZip.app` 안에 공식 7zz와 ALZ/EGG/ZPAQ/EasyCrypt 코덱·라이선스를 포함하므로 Homebrew나 엔진 수동 연결이 필요하지 않습니다. DMG를 열고 앱을 Applications로 드래그해 설치합니다.
+
+Mac에서 재현:
+
+```sh
+export MACOSX_DEPLOYMENT_TARGET=13.0
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
+cmake --build build --parallel 3
+ctest --test-dir build --output-on-failure
+python3 tools/package-macos.py --arch "$(uname -m)"
+```
+
+먼저 `vendor/7zip`에 공식 Mac용 7zz, License.txt, readme.txt, 7z2605-src.tar.xz를 준비합니다. `.github/workflows/macos-package.yml`에서 두 CPU의 빌드·통합 검사·패키징·앱 서명 검증을 실행합니다. 패키징은 포함한 엔진과 코덱으로 통합 검사를 다시 실행하고 DMG 무결성도 확인합니다.
+
+현재 Mac 배포물은 ad-hoc 서명된 개발 빌드입니다. Apple Developer ID 서명·공증을 완료한 일반 배포판은 아니며, 실제 Mac 대화형 UI 전체 검증은 별도입니다.
