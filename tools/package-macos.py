@@ -91,7 +91,7 @@ def package(build, engine, destination, arch):
             if not binary.is_file():
                 raise RuntimeError(f"Unexpected bundle executable entry: {binary}")
             binary.chmod(binary.stat().st_mode | 0o111)
-            run("lipo", "-verify_arch", arch, binary)
+            run("lipo", binary, "-verify_arch", arch)
             linked = run("otool", "-L", binary, capture_output=True, text=True).stdout
             if any(path in linked for path in ("/opt/homebrew/", "/usr/local/", "/Users/runner/")):
                 raise RuntimeError(f"Nonportable dynamic library reference: {binary.name}")
