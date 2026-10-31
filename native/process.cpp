@@ -23,7 +23,7 @@ void Engine::cancel() {
   kill(static_cast<pid_t>(process_), SIGTERM);
 #endif
 }
-std::string Engine::run(const std::vector<std::string>& args,const fs::path& program,int operation) {
+std::string Engine::run(const std::vector<std::string>& args,const fs::path& program,int operation,const fs::path& workingDirectory) {
   const auto executable=program.empty()?executable_:program;
   if (cancelled_) throw std::runtime_error("Operation cancelled.");
   progress_=-1;phase_=operation?operation:args.empty()?0:args[0]=="a"?1:args[0]=="x"?2:args[0]=="t"?3:4;
@@ -59,7 +59,7 @@ std::string Engine::run(const std::vector<std::string>& args,const fs::path& pro
   {
     std::lock_guard<std::mutex> lock(processMutex_);
     if (cancelled_) throw std::runtime_error("Operation cancelled.");
-    if (!CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, nullptr, &startup, &info)) throw std::runtime_error("Cannot start archive engine. Check that its executable is installed.");
+    if (!CreateProcessW(executable.c_str(), command.data(), nullptr, nullptr, TRUE, CREATE_NO_WINDOW, nullptr, workingDirectory.empty()?nullptr:workingDirectory.c_str(), &startup, &info)) throw std::runtime_error("Cannot start archive engine. Check that its executable is installed.");
     process.value = info.hProcess; thread.value = info.hThread; process_ = reinterpret_cast<intptr_t>(info.hProcess);
   }
   CloseHandle(write.value); write.value = nullptr;
@@ -77,6 +77,13 @@ std::string Engine::run(const std::vector<std::string>& args,const fs::path& pro
   int pipes[2]; if (pipe(pipes)) throw std::runtime_error("Cannot create engine pipe.");
   fcntl(pipes[0], F_SETFD, FD_CLOEXEC); fcntl(pipes[1], F_SETFD, FD_CLOEXEC);
   posix_spawn_file_actions_t actions; posix_spawn_file_actions_init(&actions);
+#ifdef __APPLE__
+  if(!workingDirectory.empty()&&posix_spawn_file_actions_addchdir_np(&actions,workingDirectory.c_str())){
+    posix_spawn_file_actions_destroy(&actions);close(pipes[0]);close(pipes[1]);throw std::runtime_error("Cannot set engine directory.");
+  }
+#else
+  if(!workingDirectory.empty()){posix_spawn_file_actions_destroy(&actions);close(pipes[0]);close(pipes[1]);throw std::runtime_error("Working directory unsupported on this platform.");}
+#endif
   posix_spawn_file_actions_addopen(&actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
   posix_spawn_file_actions_adddup2(&actions, pipes[1], STDOUT_FILENO);
   posix_spawn_file_actions_adddup2(&actions, pipes[1], STDERR_FILENO);
@@ -105,6 +112,7 @@ std::string Engine::run(const std::vector<std::string>& args,const fs::path& pro
 #endif
   if (overflow) throw std::runtime_error("Engine output exceeded safety limit.");
   if (cancelled_) throw std::runtime_error("Operation cancelled.");
+  if(code!=0&&executable.filename()==fs::path("MpCmdRun.exe"))throw std::runtime_error("Microsoft Defender가 탐지 또는 검사 오류를 보고했습니다 (코드 "+std::to_string(code)+"). Windows 보안의 검사 결과를 확인하세요. 파일 자동 조치는 요청하지 않았습니다.");
   if(code!=0){
     auto lower=output;std::transform(lower.begin(),lower.end(),lower.begin(),[](unsigned char c){return static_cast<char>(std::tolower(c));});
     for(const auto& message:{"wrong password","incorrect password","invalid password","password required","password is incorrect","enter password"})

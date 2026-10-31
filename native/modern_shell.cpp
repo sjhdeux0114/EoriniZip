@@ -33,6 +33,11 @@ static bool isArchive(const std::filesystem::path& p){
  for(auto ext:{L".zip",L".7z",L".rar",L".tar",L".gz",L".bz2",L".xz",L".alz",L".egg",L".zpaq",L".001",L".cab",L".iso",L".wim"})if(e==ext)return true;
  return false;
 }
+static bool archiveSelection(IShellItemArray* items,const std::vector<std::filesystem::path>& paths){
+ if(!items||!std::all_of(paths.begin(),paths.end(),isArchive))return false;
+ for(DWORD i=0;i<paths.size();++i){IShellItem* item=nullptr;if(FAILED(items->GetItemAt(i,&item)))return false;SFGAOF flags=0;auto hr=item->GetAttributes(SFGAO_FOLDER|SFGAO_STREAM,&flags);item->Release();if(FAILED(hr)||((flags&SFGAO_FOLDER)&&!(flags&SFGAO_STREAM)))return false;}
+ return true;
+}
 static std::wstring quote(const std::wstring& s){
  std::wstring out=L"\"";size_t n=0;for(auto c:s){if(c==L'\\'){++n;continue;}out.append(n*(c==L'"'?2:1),L'\\');n=0;if(c==L'"')out+=L'\\';out+=c;}out.append(n*2,L'\\');return out+L"\"";
 }
@@ -56,8 +61,8 @@ public:
  IFACEMETHODIMP GetCanonicalName(GUID* out)override{if(!out)return E_POINTER;*out=CLSID_Modern;if(kind>=0)out->Data1+=kind+1;return S_OK;}
  IFACEMETHODIMP GetState(IShellItemArray* items,BOOL,EXPCMDSTATE* state)override{
   if(!state)return E_POINTER;*state=ECS_HIDDEN;
-  try{auto paths=selection(items);if(paths.empty())return S_OK;bool archives=std::all_of(paths.begin(),paths.end(),isArchive);if(paths.size()==1)previewPath=paths[0];
-   bool visible=(kind>=8&&paths.size()==1&&_wcsicmp(paths[0].extension().c_str(),L".zip")==0)||kind<0||kind==1||kind==2||(kind==3&&paths.size()>1)||(kind==7&&paths.size()>1&&archives)||((kind==0||kind==4||kind==5||kind==6)&&paths.size()==1&&archives);
+  try{auto paths=selection(items);if(paths.empty())return S_OK;bool archives=archiveSelection(items,paths);if(paths.size()==1)previewPath=paths[0];
+   bool visible=(kind>=8&&archives&&paths.size()==1&&_wcsicmp(paths[0].extension().c_str(),L".zip")==0)||kind<0||kind==1||kind==2||(kind==3&&paths.size()>1)||(kind==7&&paths.size()>1&&archives)||((kind==0||kind==4||kind==5||kind==6)&&paths.size()==1&&archives);
    *state=visible?ECS_ENABLED:ECS_HIDDEN;return S_OK;
   }catch(...){return E_FAIL;}
  }

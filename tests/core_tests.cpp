@@ -2,6 +2,7 @@
 #include "archive_name.hpp"
 #include "split_presets.hpp"
 #include "preferences.hpp"
+#include "ui_language.hpp"
 #include <iostream>
 #include <fstream>
 #include <random>
@@ -17,6 +18,17 @@ void check(bool value, const char* message) { if(!value) throw std::runtime_erro
 template<class F> void rejects(F f) { bool failed=false; try{f();}catch(const std::exception&){failed=true;}check(failed,"Expected rejection"); }
 int main(int argc,char** argv) {
   try {
+    kz::ui::english=true;
+    check(kz::ui::label(L"압축 파일 열기\tCtrl+O")==L"Open archive\tCtrl+O","English labels preserve keyboard shortcuts");
+    check(kz::ui::label(L"C:\\한글\\압축 파일 열기.txt")==L"C:\\한글\\압축 파일 열기.txt","Localization preserves user file paths");
+    kz::ui::english=false;check(kz::ui::label(L"압축 파일 열기")==L"압축 파일 열기","Korean labels preserved");
+    const std::string decomposed=u8"\u1112\u1161\u11ab\u1100\u1173\u11af";
+    check(kz::composeFilename(decomposed)==u8"한글","macOS decomposed Hangul composes to NFC");
+    check(kz::composeFilename(u8"cafe\u0301.txt")==u8"café.txt","Accented Latin composition");
+    check(kz::composeFilename(u8"😀 한글.txt")==u8"😀 한글.txt","Supplementary Unicode preserved");
+    kz::Entry nfd,nfc;nfd.name=decomposed+".txt";nfc.name=u8"한글.txt";
+    rejects([&]{kz::validateEntries({nfd,nfc});});
+    nfd.name=u8"café.txt";nfc.name=u8"CAFÉ.TXT";rejects([&]{kz::validateEntries({nfd,nfc});});
     kz::Preferences prefs;
     for(const auto& field:kz::preferenceFields())prefs.*(field.member)=field.maximum;
     auto restored=kz::importPreferences(kz::exportPreferences(prefs));
@@ -65,6 +77,51 @@ int main(int argc,char** argv) {
       auto input=root/kz::fs::u8path("한글.txt"); const std::string content="EoriniZip native round trip 한글";
       {std::ofstream file(input,std::ios::binary); file<<content;}
       kz::Engine engine(kz::fs::u8path(argv[1]));
+      {
+        auto customTemp=root/"custom-temp";kz::fs::create_directory(customTemp);engine.configureTemporaryDirectory(customTemp);
+        for(const auto& pair:std::vector<std::pair<std::string,std::string>>{{"gzip","gz"},{"bzip2","bz2"},{"xz","xz"},{"wim","wim"}}){
+          kz::Options options;options.format=pair.first;
+          auto output=engine.create(options,root/("single."+pair.second),{input});engine.test(output);
+          auto destination=root/("single-"+pair.second);kz::fs::create_directory(destination);engine.extract(output,destination);
+          check(!kz::fs::is_empty(destination),"Single stream extraction produced a file");
+          for(const auto& entry:kz::fs::directory_iterator(destination)){std::ifstream file(entry.path(),std::ios::binary);std::string actual((std::istreambuf_iterator<char>(file)),{});check(actual==content,"Additional creation format bytes preserved");}
+        }
+        check(kz::fs::is_empty(customTemp),"Custom compression temp folder cleaned");engine.configureTemporaryDirectory({});
+        auto isoSource=root/"iso-source";kz::fs::create_directory(isoSource);kz::fs::copy_file(input,isoSource/input.filename());
+        kz::Options iso;iso.format="iso";auto image=engine.create(iso,root/"data.iso",{isoSource});engine.test(image);
+        auto isoDestination=root/"iso-extracted";kz::fs::create_directory(isoDestination);engine.extract(image,isoDestination);
+        check(kz::fs::exists(isoDestination/input.filename()),"ISO contains folder contents with Korean names");
+        {std::ifstream file(isoDestination/input.filename(),std::ios::binary);std::string actual((std::istreambuf_iterator<char>(file)),{});check(actual==content,"ISO file content roundtrip");}
+#ifdef _WIN32
+        if(kz::fs::exists(kz::fs::u8path(argv[1]).parent_path()/"7z.sfx")){
+          kz::Options sfx;sfx.format="7z";sfx.selfExtracting=true;sfx.password="sfx-password";sfx.hideNames=true;
+          auto output=engine.create(sfx,root/"self-extracting.exe",{input});engine.test(output,sfx.password);
+          auto entries=engine.list(output,sfx.password);check(entries.size()==1&&entries[0].name=="한글.txt","Official engine creates readable SFX with encrypted header");
+        }else std::cout<<"SFX SKIPPED: official 7z.sfx missing\n";
+#endif
+      }
+      {
+        kz::Options options;options.level=0;auto original=engine.create(options,root/"repair-source.zip",{input});
+        std::ifstream f(original,std::ios::binary);std::string bytes((std::istreambuf_iterator<char>(f)),{});auto central=bytes.find("PK\001\002");check(central!=std::string::npos,"ZIP central directory fixture");
+        auto broken=root/"repair-damaged.zip";{std::ofstream truncated(broken,std::ios::binary);truncated.write(bytes.data(),static_cast<std::streamsize>(central));}
+        auto originalBrokenSize=kz::fs::file_size(broken);auto repaired=engine.repairZip(broken,root);engine.test(repaired);
+        auto recoveredEntries=engine.list(repaired);check(recoveredEntries.size()==1&&recoveredEntries[0].name=="한글.txt","Recover ZIP with missing central directory");
+        check(kz::fs::file_size(broken)==originalBrokenSize,"ZIP recovery never modifies source");
+        auto corrupt=root/"repair-corrupt.zip";bytes[central-1]^=0x7f;{std::ofstream damaged(corrupt,std::ios::binary);damaged.write(bytes.data(),static_cast<std::streamsize>(central));}
+        rejects([&]{engine.repairZip(corrupt,root);});check(!kz::fs::exists(root/"repair-corrupt-recovered.zip"),"CRC failure does not publish recovered ZIP");
+      }
+      {
+        auto macInput=root/kz::fs::u8path(decomposed+".txt");{std::ofstream f(macInput);f<<"macOS name";}
+        kz::Options options;
+        auto macArchive=engine.create(options,root/"mac-nfd.zip",{macInput});
+        auto macEntries=engine.list(macArchive);check(macEntries.size()==1,"NFD archive listing");
+        auto destination=root/"mac-normalized";kz::fs::create_directory(destination);
+        engine.extract(macArchive,destination,"",{macEntries[0].name});
+        check(kz::fs::exists(destination/kz::fs::u8path("한글.txt")),"NFD extraction yields usable NFC name");
+        std::ifstream f(destination/kz::fs::u8path("한글.txt"));std::string value;std::getline(f,value);check(value=="macOS name","NFD content preserved");
+        engine.extract(macArchive,destination);
+        check(kz::fs::exists(destination/kz::fs::u8path("한글 (1).txt")),"NFD repeated extraction collision protection");
+      }
       for(const auto& format : {"zip","7z","tar","zpaq"}) {
         kz::Options opt; opt.format=format; if(opt.format!="tar")opt.password="test & password"; opt.hideNames=opt.format=="7z";
         auto filename=std::string("archive.")+format;
@@ -90,11 +147,28 @@ int main(int argc,char** argv) {
       for(const auto* format:{"zip","7z"}){
         kz::Options options;options.format=format;options.password="edit-test-password";options.hideNames=options.format=="7z";
         auto editable=engine.create(options,root/(std::string("editable.")+format),{input});
+        check(engine.recoverPassword(editable,{"wrong-candidate",options.password})==options.password,"Password candidate recovery validates full archive");
+        rejects([&]{engine.recoverPassword(editable,{"wrong-candidate"});});
+        if(options.format=="zip"){
+          check(engine.comment(editable).empty(),"New ZIP comment empty");
+          engine.setComment(editable,u8"한글 ZIP 설명\nsecond line",options.password);
+          check(engine.comment(editable)==u8"한글 ZIP 설명\nsecond line","UTF-8 ZIP comment roundtrip");
+          auto commentStamp=kz::fs::last_write_time(editable);auto commentSize=kz::fs::file_size(editable);
+          rejects([&]{engine.setComment(editable,"new comment","wrong");});
+          check(kz::fs::last_write_time(editable)==commentStamp&&kz::fs::file_size(editable)==commentSize,"Failed comment edit preserves archive");
+          rejects([&]{engine.setComment(editable,std::string(65536,'a'),options.password);});
+        }
         auto extra=root/"extra.txt";{std::ofstream f(extra);f<<"added data";}
         engine.edit(editable,"a",{extra.u8string()},options.password);
         auto added=engine.list(editable,options.password);check(added.size()==2,"Add file to encrypted archive");
         check(std::all_of(added.begin(),added.end(),[](const auto& e){return e.encrypted;}),"Added files preserve encryption");
         engine.edit(editable,"rn",{"extra.txt","renamed.txt"},options.password);
+        {std::ofstream f(extra);f<<"external editor replacement";}
+        engine.edit(editable,"replace",{"renamed.txt",extra.u8string()},options.password);
+        auto replaced=root/(std::string("replaced-")+format);kz::fs::create_directory(replaced);
+        engine.extract(editable,replaced,options.password,{"renamed.txt"});
+        {std::ifstream f(replaced/"renamed.txt");std::string value;std::getline(f,value);check(value=="external editor replacement","External edit replace preserves saved bytes");}
+        rejects([&]{engine.edit(editable,"replace",{"../escape",extra.u8string()},options.password);});
         auto edited=engine.list(editable,options.password);
         check(std::any_of(edited.begin(),edited.end(),[](const auto& e){return e.name=="renamed.txt";}),"Rename internal file");
         auto before=kz::fs::file_size(editable);auto stamp=kz::fs::last_write_time(editable);
@@ -103,6 +177,11 @@ int main(int argc,char** argv) {
         check(kz::fs::file_size(editable)==before&&kz::fs::last_write_time(editable)==stamp,"Failed edit preserves original archive");
         engine.edit(editable,"d",{"renamed.txt"},options.password);
         check(engine.list(editable,options.password).size()==1,"Delete internal file");engine.test(editable,options.password);
+        auto nestedSource=root/(std::string("nested-source-")+format);kz::fs::create_directory(nestedSource);kz::fs::copy_file(input,nestedSource/input.filename());
+        auto nested=engine.create(options,root/(std::string("nested-edit.")+format),{nestedSource});auto nestedName=nestedSource.filename().u8string()+"/한글.txt";
+        engine.edit(nested,"replace",{nestedName,extra.u8string()},options.password);
+        auto nestedOut=root/(std::string("nested-output-")+format);kz::fs::create_directory(nestedOut);engine.extract(nested,nestedOut,options.password);
+        {std::ifstream file(nestedOut/kz::fs::u8path(nestedName));std::string value;std::getline(file,value);check(value=="external editor replacement","External edit preserves nested archive path");}
       }
       auto randomFile=root/"random.bin"; {std::ofstream f(randomFile,std::ios::binary); std::mt19937 gen(42); for(int i=0;i<100000;++i)f.put(static_cast<char>(gen()));}
       kz::Options split;split.format="7z";split.split="10k";

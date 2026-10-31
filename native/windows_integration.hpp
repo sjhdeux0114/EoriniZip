@@ -47,7 +47,7 @@ inline void associations(const std::vector<bool>& selected){
 inline void shellRegistration(bool install){
   const std::wstring clsid=L"{5B30EB48-528D-446B-B18E-BB516C5B902F}";
   const auto exe=std::filesystem::path(executablePath());
-  const auto dll=exe.parent_path()/L"EoriniZipShell_v3.dll";
+  const auto dll=exe.parent_path()/L"EoriniZipShell_v051.dll";
   const wchar_t* handlers[]={L"Software\\Classes\\*\\shellex\\ContextMenuHandlers\\EoriniZip",L"Software\\Classes\\Directory\\shellex\\ContextMenuHandlers\\EoriniZip"};
   if(install){
     if(!std::filesystem::is_regular_file(dll))throw std::runtime_error("탐색기 확장 DLL이 실행 파일 옆에 필요합니다.");

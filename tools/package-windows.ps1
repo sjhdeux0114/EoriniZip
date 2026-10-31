@@ -1,7 +1,8 @@
 param(
  [string]$BuildDirectory='build-validation',
  [string]$SevenZipDirectory='vendor\7zip',
- [string]$Destination='dist\EoriniZip'
+ [string]$Destination='dist\EoriniZip',
+ [string]$SignedContextMenuPackage
 )
 $ErrorActionPreference='Stop'
 $root=Split-Path -Parent $PSScriptRoot
@@ -10,10 +11,10 @@ $engine=(Resolve-Path -LiteralPath (Join-Path $root $SevenZipDirectory)).Path
 $target=[IO.Path]::GetFullPath((Join-Path $root $Destination))
 if(-not $target.StartsWith($root+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Package output must stay inside this workspace.'}
 New-Item -ItemType Directory -Force $target,(Join-Path $target '7zip'),(Join-Path $target 'licenses'),(Join-Path $target 'Package\Assets') | Out-Null
-foreach($file in @('EoriniZip.exe','EoriniZipShell_v3.dll','EoriniZipModernShell.dll','eorinizip-unalz.exe','eorinizip-unegg.exe','eorinizip-zpaq.exe','eorinizip-easycrab.exe')){
+foreach($file in @('EoriniZip.exe','EoriniZipShell_v051.dll','EoriniZipModernShell_v051.dll','eorinizip-unalz.exe','eorinizip-unegg.exe','eorinizip-zpaq.exe','eorinizip-easycrab.exe')){
  Copy-Item -LiteralPath (Join-Path $build $file) -Destination $target
 }
-foreach($file in @('7z.exe','7z.dll','License.txt','readme.txt')){
+foreach($file in @('7z.exe','7z.dll','7z.sfx','License.txt','readme.txt')){
  Copy-Item -LiteralPath (Join-Path $engine $file) -Destination (Join-Path $target '7zip')
 }
 Copy-Item -LiteralPath (Join-Path $root 'THIRD_PARTY_NOTICES.txt') -Destination $target
@@ -26,6 +27,15 @@ foreach($codec in @('unalz','unegg','easycrab','zpaq')){
 }
 Copy-Item -LiteralPath (Join-Path $root 'third_party\zpaq\libzpaq.cpp') -Destination (Join-Path $target 'licenses\zpaq')
 Copy-Item -LiteralPath (Join-Path $root 'packaging\windows11\AppxManifest.xml') -Destination (Join-Path $target 'Package')
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'windows11-menu.ps1') -Destination $target
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'check-updates.ps1') -Destination $target
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'update-security.ps1') -Destination $target
+# A production identity package must be signed with the manifest publisher's certificate.
+if($SignedContextMenuPackage){
+ Copy-Item -LiteralPath (Resolve-Path -LiteralPath $SignedContextMenuPackage).Path -Destination (Join-Path $target 'Package\EoriniZip.ContextMenu.msix')
+}elseif(Test-Path -LiteralPath (Join-Path $target 'Package\EoriniZip.ContextMenu.msix')){
+ throw 'A stale context menu MSIX exists. Supply -SignedContextMenuPackage explicitly or remove it before packaging.'
+}
 Add-Type -AssemblyName System.Drawing
 $image=[Drawing.Image]::FromFile((Join-Path $root 'assets\logo.png'))
 try{

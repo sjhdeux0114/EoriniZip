@@ -30,7 +30,7 @@ if($Action -eq 'Uninstall') {
   Write-Host 'EoriniZip context menu removed for the current user.'
 } else {
   $Executable=(Resolve-Path -LiteralPath $Executable).Path
-  $dll=(Resolve-Path -LiteralPath (Join-Path (Split-Path $Executable) 'EoriniZipShell_v3.dll')).Path
+  $dll=(Resolve-Path -LiteralPath (Join-Path (Split-Path $Executable) 'EoriniZipShell_v051.dll')).Path
   $key=[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey("$base\CLSID\$clsid\InprocServer32")
   try { $key.SetValue('',$dll);$key.SetValue('ThreadingModel','Apartment') } finally {$key.Dispose()}
   foreach($path in $handlers){

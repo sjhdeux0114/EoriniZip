@@ -11,6 +11,7 @@ struct Preferences {
   int unicodeNames=1,storeTimes=1,excludeThumbs=0,parallel=1,zone=1,codePageIndex=0;
   int showTree=1,showStatus=1,theme=0x15b3f0,level=2;
   int closeAfterCreate=0,closeAfterExtract=0;
+  int fontFamily=0,fontSize=1,columnMask=15,checkUpdates=0,showToolbar=1,language=0;
 };
 struct PreferenceField {const char* name;int Preferences::*member;int maximum;};
 inline const std::vector<PreferenceField>& preferenceFields(){
@@ -20,7 +21,8 @@ inline const std::vector<PreferenceField>& preferenceFields(){
     {"ShowTree",&Preferences::showTree,1},{"ShowStatus",&Preferences::showStatus,1},{"Theme",&Preferences::theme,0xffffff},
     {"UnicodeNames",&Preferences::unicodeNames,1},{"StoreTimes",&Preferences::storeTimes,1},{"ExcludeThumbs",&Preferences::excludeThumbs,1},
     {"Parallel",&Preferences::parallel,1},{"PropagateZone",&Preferences::zone,1},{"CodePageIndex",&Preferences::codePageIndex,6},
-    {"CloseAfterCreate",&Preferences::closeAfterCreate,1},{"CloseAfterExtract",&Preferences::closeAfterExtract,1}
+    {"CloseAfterCreate",&Preferences::closeAfterCreate,1},{"CloseAfterExtract",&Preferences::closeAfterExtract,1},
+    {"FontFamily",&Preferences::fontFamily,2},{"FontSize",&Preferences::fontSize,4},{"ColumnMask",&Preferences::columnMask,15},{"CheckUpdates",&Preferences::checkUpdates,1},{"ShowToolbar",&Preferences::showToolbar,1},{"Language",&Preferences::language,1}
   };return fields;
 }
 inline std::string exportPreferences(const Preferences& p){

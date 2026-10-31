@@ -5,13 +5,15 @@
 #include <algorithm>
 #include "core.hpp"
 #include "resource.h"
+#include "ui_language.hpp"
 namespace kz::win {
 inline bool imagePreview(const fs::path& file){auto ext=file.extension().wstring();std::transform(ext.begin(),ext.end(),ext.begin(),::towlower);return ext==L".png"||ext==L".jpg"||ext==L".jpeg"||ext==L".bmp"||ext==L".gif";}
 inline bool textPreview(const fs::path& file){auto ext=file.extension().wstring();std::transform(ext.begin(),ext.end(),ext.begin(),::towlower);for(auto value:{L".txt",L".md",L".json",L".xml",L".csv",L".log",L".ini",L".yaml",L".yml",L".cpp",L".h",L".c",L".cs",L".py"})if(ext==value)return true;return false;}
 struct PreviewData{fs::path file;HBITMAP bitmap=nullptr;std::wstring contents,error;};
 inline INT_PTR CALLBACK previewProcedure(HWND dialog,UINT message,WPARAM wp,LPARAM lp){
  if(message==WM_INITDIALOG){
-  auto data=reinterpret_cast<PreviewData*>(lp);SetWindowLongPtrW(dialog,DWLP_USER,lp);SetWindowTextW(dialog,(data->file.filename().wstring()+L" - 미리보기 - 어린이zip").c_str());
+  kz::ui::dialog(dialog);
+  auto data=reinterpret_cast<PreviewData*>(lp);SetWindowLongPtrW(dialog,DWLP_USER,lp);SetWindowTextW(dialog,(data->file.filename().wstring()+(kz::ui::english?L" - Preview - EoriniZip":L" - 미리보기 - 어린이zip")).c_str());
   try{
    if(imagePreview(data->file)){
     ShowWindow(GetDlgItem(dialog,IDC_PREVIEW_TEXT),SW_HIDE);

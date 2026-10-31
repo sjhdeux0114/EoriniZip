@@ -4,7 +4,7 @@
 #include "archive_name.hpp"
 #include <memory>
 #include <functional>
-static NSString* S(const std::string& s) { return [[NSString alloc] initWithBytes:s.data() length:s.size() encoding:NSUTF8StringEncoding] ?: @"Invalid UTF-8"; }
+static NSString* S(const std::string& s) { return [[[NSString alloc] initWithBytes:s.data() length:s.size() encoding:NSUTF8StringEncoding] precomposedStringWithCanonicalMapping] ?: @"Invalid UTF-8"; }
 @interface YellowHomeView : NSView
 @end
 @implementation YellowHomeView
@@ -42,7 +42,7 @@ static NSString* S(const std::string& s) { return [[NSString alloc] initWithByte
   self.window.title=@"어린이zip"; self.window.minSize=NSMakeSize(1000,620); self.window.delegate=self;
   self.controls=[NSMutableArray array];
   NSImageView* logo=[[NSImageView alloc] initWithFrame:NSMakeRect(20,606,48,48)]; logo.image=NSApp.applicationIconImage; [self.window.contentView addSubview:logo];
-  [self label:@"어린이zip   |   Native Preview 0.1" frame:NSMakeRect(80,632,800,24)];
+  [self label:@"어린이zip   |   Native Preview 0.5.1" frame:NSMakeRect(80,632,800,24)];
   [self label:@"ZIP · 7Z · TAR / RAR 읽기 / ALZ · EGG 읽기 / ZPAQ" frame:NSMakeRect(80,606,850,24)];
   NSArray* titles=@[@"열기",@"파일 압축",@"폴더 압축",@"압축 풀기",@"검사",@"엔진 연결",@"취소",@"다시 읽기"];
   for(NSInteger i=0;i<8;i++) {
@@ -50,7 +50,7 @@ static NSString* S(const std::string& s) { return [[NSString alloc] initWithByte
     button.tag=i; button.frame=NSMakeRect(16+i*120,550,114,34); [self.window.contentView addSubview:button]; [self.controls addObject:button];
   }
   [self label:@"형식" frame:NSMakeRect(20,510,36,24)];
-  self.format=[[NSPopUpButton alloc] initWithFrame:NSMakeRect(60,508,84,28) pullsDown:NO]; [self.format addItemsWithTitles:@[@"zip",@"7z",@"tar",@"zpaq"]];
+  self.format=[[NSPopUpButton alloc] initWithFrame:NSMakeRect(60,508,84,28) pullsDown:NO]; [self.format addItemsWithTitles:@[@"zip",@"7z",@"tar",@"zpaq",@"gzip",@"bzip2",@"xz",@"wim",@"iso"]];
   [self.window.contentView addSubview:self.format];
   [self label:@"비밀번호" frame:NSMakeRect(164,510,70,24)];
   self.password=[[NSSecureTextField alloc] initWithFrame:NSMakeRect(235,508,180,28)]; [self.window.contentView addSubview:self.password];
@@ -94,7 +94,7 @@ static NSString* S(const std::string& s) { return [[NSString alloc] initWithByte
 - (void)showHome:(id)sender { (void)sender; if(!busy)self.home.hidden=!self.home.hidden; }
 - (void)optionsChanged:(id)sender {
   (void)sender;
-  BOOL tar=self.format.indexOfSelectedItem==2,seven=self.format.indexOfSelectedItem==1;
+  BOOL tar=self.format.indexOfSelectedItem==2||self.format.indexOfSelectedItem>=4,seven=self.format.indexOfSelectedItem==1;
   self.splitPreset.enabled=!busy&&!tar&&self.format.indexOfSelectedItem!=3;
   self.split.enabled=!busy&&!tar&&self.format.indexOfSelectedItem!=3&&self.splitPreset.indexOfSelectedItem==(NSInteger)kz::customSplitIndex;
   self.hideNames.enabled=!busy&&seven;if(!seven)self.hideNames.state=NSControlStateValueOff;
@@ -155,7 +155,7 @@ static NSString* S(const std::string& s) { return [[NSString alloc] initWithByte
     NSView* form=[[NSView alloc] initWithFrame:NSMakeRect(0,0,420,210)];
     NSArray* labels=@[@"압축 형식",@"분할 압축",@"직접 입력",@"비밀번호"];
     for(NSInteger i=0;i<4;++i){NSTextField* label=[NSTextField labelWithString:labels[i]];label.frame=NSMakeRect(0,180-i*38,85,22);[form addSubview:label];}
-    NSPopUpButton* format=[[NSPopUpButton alloc] initWithFrame:NSMakeRect(90,178,320,28) pullsDown:NO];[format addItemsWithTitles:@[@"zip",@"7z",@"tar",@"zpaq"]];
+    NSPopUpButton* format=[[NSPopUpButton alloc] initWithFrame:NSMakeRect(90,178,320,28) pullsDown:NO];[format addItemsWithTitles:@[@"zip",@"7z",@"tar",@"zpaq",@"gzip",@"bzip2",@"xz",@"wim",@"iso"]];
     [format selectItemAtIndex:self.format.indexOfSelectedItem];[form addSubview:format];
     NSPopUpButton* presets=[[NSPopUpButton alloc] initWithFrame:NSMakeRect(90,140,320,28) pullsDown:NO];
     for(const auto& preset:kz::splitPresets)[presets addItemWithTitle:S(preset.label)];
@@ -170,8 +170,8 @@ static NSString* S(const std::string& s) { return [[NSString alloc] initWithByte
     self.hideNames.state=encryptNames.state;[self optionsChanged:nil];self.home.hidden=YES;
     auto inputs=[self chooseFolder:action==2 multiple:action==1]; if(inputs.empty())return;
     kz::Options o; o.format=self.format.titleOfSelectedItem.UTF8String; o.password=self.password.stringValue.UTF8String; try {
-      if(o.format!="tar"&&o.format!="zpaq")o.split=kz::splitArgument(static_cast<size_t>(self.splitPreset.indexOfSelectedItem),self.split.stringValue.UTF8String);
-      if(o.format=="tar")o.password.clear();
+      if(o.format=="zip"||o.format=="7z")o.split=kz::splitArgument(static_cast<size_t>(self.splitPreset.indexOfSelectedItem),self.split.stringValue.UTF8String);
+      if(o.format=="tar"||o.format=="gzip"||o.format=="bzip2"||o.format=="xz"||o.format=="wim"||o.format=="iso")o.password.clear();
       o.hideNames=o.format=="7z"&&self.hideNames.state==NSControlStateValueOn;
       kz::createArgs(o,"validation",inputs);
     }catch(const std::exception& e){self.status.stringValue=S(e.what());return;}

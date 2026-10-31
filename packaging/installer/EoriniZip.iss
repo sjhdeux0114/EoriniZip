@@ -1,5 +1,8 @@
-﻿#define AppVersion "0.5"
+#define AppVersion "0.5.1"
 #define AppName "어린이zip"
+#ifndef PackageDirectory
+#define PackageDirectory "..\..\dist\EoriniZip"
+#endif
 [Setup]
 #ifdef TestInstall
 AppId={{244F199B-6CB9-4FCF-B031-858B47F0276C}
@@ -18,9 +21,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 OutputDir=..\..\dist
 #ifdef TestInstall
-OutputBaseFilename=EoriniZip-0.5-installer-test
+OutputBaseFilename=EoriniZip-0.5.1-installer-test
 #else
-OutputBaseFilename=EoriniZip-0.5-windows-x64-setup
+OutputBaseFilename=EoriniZip-0.5.1-windows-x64-setup
 #endif
 SetupIconFile=..\..\assets\EoriniZip.ico
 UninstallDisplayIcon={app}\EoriniZip.exe
@@ -30,20 +33,52 @@ WizardStyle=modern
 CloseApplications=no
 RestartApplications=no
 ChangesAssociations=yes
-VersionInfoVersion=0.5.0.0
+VersionInfoVersion=0.5.1.0
 [Languages]
 Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
-Name: "explorer"; Description: "탐색기 우클릭 메뉴 등록 (Windows 11: 더 많은 옵션)"
+Name: "explorer"; Description: "탐색기 우클릭 메뉴 등록"
 Name: "desktopicon"; Description: "바탕 화면 바로 가기 만들기"; Flags: unchecked
 [Files]
-Source: "..\..\dist\EoriniZip\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PackageDirectory}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\EoriniZip.exe"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\EoriniZip.exe"; Tasks: desktopicon
+[UninstallRun]
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\windows11-menu.ps1"" -Action Uninstall"; Flags: runhidden waituntilterminated; RunOnceId: "RemoveModernContextMenu"; Check: FileExists(ExpandConstant('{app}\windows11-menu.ps1'))
+[Code]
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
+  Script, PackagePath, Parameters: String;
+  WindowsVersion: TWindowsVersion;
+begin
+  GetWindowsVersionEx(WindowsVersion);
+  if (CurStep <> ssPostInstall) or (not WizardIsTaskSelected('explorer')) or
+     (WindowsVersion.Build < 22000) then
+    Exit;
+  Script := ExpandConstant('{app}\windows11-menu.ps1');
+  PackagePath := ExpandConstant('{app}\Package\EoriniZip.ContextMenu.msix');
+  if not FileExists(PackagePath) then begin
+    Log('Windows 11 modern menu unavailable: signed identity MSIX is missing.');
+    if not WizardSilent then
+      MsgBox('Windows 11 첫 우클릭 메뉴용 서명 패키지가 포함되지 않았습니다. 어린이zip 메뉴는 [더 많은 옵션 표시]에서 사용할 수 있습니다.', mbInformation, MB_OK);
+    Exit;
+  end;
+  Parameters := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + Script +
+    '" -Action InstallSigned -Directory "' + ExpandConstant('{app}') + '"';
+  if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    Parameters, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    ResultCode := -1;
+  if ResultCode <> 0 then begin
+    Log('Windows 11 context menu registration failed: ' + IntToStr(ResultCode));
+    if not WizardSilent then
+      MsgBox('Windows 11 메뉴 등록에 실패했습니다. [더 많은 옵션 표시]의 메뉴를 사용하거나 설치 폴더의 windows11-menu.ps1로 등록 오류를 확인하세요.', mbInformation, MB_OK);
+  end;
+end;
 [Registry]
-Root: HKCU; Subkey: "Software\Classes\CLSID\{{5B30EB48-528D-446B-B18E-BB516C5B902F}\InprocServer32"; ValueType: string; ValueName: ""; ValueData: "{app}\EoriniZipShell_v3.dll"; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\CLSID\{{5B30EB48-528D-446B-B18E-BB516C5B902F}\InprocServer32"; ValueType: string; ValueName: ""; ValueData: "{app}\EoriniZipShell_v051.dll"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\CLSID\{{5B30EB48-528D-446B-B18E-BB516C5B902F}\InprocServer32"; ValueType: string; ValueName: "ThreadingModel"; ValueData: "Apartment"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\*\shellex\ContextMenuHandlers\EoriniZip"; ValueType: string; ValueName: ""; ValueData: "{{5B30EB48-528D-446B-B18E-BB516C5B902F}"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\Directory\shellex\ContextMenuHandlers\EoriniZip"; ValueType: string; ValueName: ""; ValueData: "{{5B30EB48-528D-446B-B18E-BB516C5B902F}"; Flags: uninsdeletekey; Tasks: explorer

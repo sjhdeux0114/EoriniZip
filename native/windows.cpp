@@ -14,10 +14,26 @@
 #include <commdlg.h>
 #include "windows_integration.hpp"
 #include "preview_window.hpp"
+#include "windows_clipboard.hpp"
+#include "windows_passwords.hpp"
 #include <algorithm>
 #include <chrono>
 #include <map>
 #include <fstream>
+#include "ui_language.hpp"
+namespace {
+BOOL uiWindowText(HWND target,LPCWSTR value){auto translated=kz::ui::editable(target)?std::wstring(value?value:L""):kz::ui::label(value?value:L"");return SetWindowTextW(target,translated.c_str());}
+BOOL uiDialogText(HWND target,int id,LPCWSTR value){auto control=GetDlgItem(target,id);return uiWindowText(control,value);}
+int uiMessageBox(HWND owner,LPCWSTR value,LPCWSTR caption,UINT flags){auto message=kz::ui::label(value?value:L""),title=kz::ui::label(caption?caption:L"");return MessageBoxW(owner,message.c_str(),title.c_str(),flags);}
+LRESULT uiDialogMessage(HWND target,int id,UINT message,WPARAM wp,LPARAM lp){
+  if(lp&&(message==CB_ADDSTRING||(message==LB_ADDSTRING&&id==IDC_CATEGORIES))){auto translated=kz::ui::label(reinterpret_cast<LPCWSTR>(lp));return SendDlgItemMessageW(target,id,message,wp,reinterpret_cast<LPARAM>(translated.c_str()));}
+  return SendDlgItemMessageW(target,id,message,wp,lp);
+}
+}
+#define SetWindowTextW uiWindowText
+#define SetDlgItemTextW uiDialogText
+#define MessageBoxW uiMessageBox
+#define SendDlgItemMessageW uiDialogMessage
 namespace {
 HWND progressWindow=nullptr, tree=nullptr;
 HWND window, list, statusText, pathText, password, passwordLabel, logo, homeOpen, homeCreate;
@@ -35,20 +51,29 @@ std::vector<kz::Entry> archiveEntries,visibleEntries;
 std::vector<std::string> treePaths;
 std::map<std::string,HTREEITEM> treeItems;
 std::string currentFolder;
+std::vector<kz::fs::path> clipboardRoots;
 int sortColumn=0;bool sortAscending=true;HMENU recentMenu=nullptr;std::vector<kz::fs::path> recentFiles;
 constexpr int RecentFirst=400,RecentClear=410;
 int dpi=96;
 using PreferencesData=kz::Preferences;
 PreferencesData preferences;
+kz::fs::path temporaryFolder,pendingTemporaryFolder;
 const int codePages[]={0,949,932,936,950,1252,65001};
+const char* creationFormats[]={"zip","7z","tar","zpaq","gzip","bzip2","xz","7z","wim","iso"};
+const char* creationExtensions[]={"zip","7z","tar","zpaq","gz","bz2","xz","exe","wim","iso"};
+const char* formatForIndex(int index){return creationFormats[std::clamp(index,0,9)];}
+const char* extensionForIndex(int index){return creationExtensions[std::clamp(index,0,9)];}
 COLORREF pendingTheme=RGB(240,179,21);
 constexpr const wchar_t* preferencesKey=L"Software\\EoriniZip\\Preferences";
 void loadPreferences() {
+  wchar_t temp[32768]{};DWORD tempSize=sizeof(temp);
+  if(RegGetValueW(HKEY_CURRENT_USER,preferencesKey,L"TemporaryFolder",RRF_RT_REG_SZ,nullptr,temp,&tempSize)==ERROR_SUCCESS&&kz::fs::is_directory(temp))temporaryFolder=temp;
   for(const auto& field:kz::preferenceFields()){
     std::wstring name(field.name,field.name+strlen(field.name));DWORD value=0,size=sizeof(value);
     if(RegGetValueW(HKEY_CURRENT_USER,preferencesKey,name.c_str(),RRF_RT_REG_DWORD,nullptr,&value,&size)==ERROR_SUCCESS&&value<=static_cast<DWORD>(field.maximum))
       preferences.*(field.member)=static_cast<int>(value);
   }
+  kz::ui::english=preferences.language==1;
 }
 bool savePreferences() {
   HKEY key;if(RegCreateKeyExW(HKEY_CURRENT_USER,preferencesKey,0,nullptr,0,KEY_SET_VALUE,nullptr,&key,nullptr)!=ERROR_SUCCESS)return false;
@@ -59,9 +84,9 @@ bool savePreferences() {
   }
   RegCloseKey(key);return ok;
 }
-enum { Open=100, CreateFiles, CreateFolder, Extract, Test, Connect, Cancel, Refresh, Home, About, Exit, SelectAll, CopyNames, CloseArchive, SaveAs, OpenFolder, NewWindow, Topmost, ToggleStatus, AppFolder, HelpPage, IssuesPage, Website, FindFile, Preferences, ToggleTree, ColorSettings, ExtractSelected, ExtractSmart, DecryptEasy, AddEntries, DeleteEntries, RenameEntry, DeleteArchive, DeleteArchivePermanent, NewAdminWindow, PreviewEntry };
+enum { Open=100, CreateFiles, CreateFolder, Extract, Test, Connect, Cancel, Refresh, Home, About, Exit, SelectAll, CopyNames, CloseArchive, SaveAs, OpenFolder, NewWindow, Topmost, ToggleStatus, AppFolder, HelpPage, IssuesPage, Website, FindFile, Preferences, ToggleTree, ColorSettings, ExtractSelected, ExtractSmart, DecryptEasy, AddEntries, DeleteEntries, RenameEntry, DeleteArchive, DeleteArchivePermanent, NewAdminWindow, PreviewEntry, CopyFiles, PasteFiles, ExternalEdit, EditComment, ScanArchive, SavePassword, LoadPassword, DeletePassword, RecoverPassword, RepairZip, CheckUpdates, ToggleToolbar, ViewSettings, LastCommand=ViewSettings };
 constexpr UINT Finished=WM_APP+1, Startup=WM_APP+2;
-struct Result { std::vector<kz::Entry> entries; bool listing=false; std::string message; bool success=true; bool passwordNeeded=false; kz::fs::path previewFile,previewRoot; };
+struct Result { std::vector<kz::Entry> entries; bool listing=false; std::string message; bool success=true; bool passwordNeeded=false; kz::fs::path previewFile,previewRoot,clipboardRoot,editFile,editRoot,editArchive; std::string editName,editPassword; uintmax_t editSize=0; kz::fs::file_time_type editStamp{}; std::string recoveredPassword; };
 struct CreateRequest {
   std::vector<kz::fs::path> inputs;
   kz::fs::path output;
@@ -70,12 +95,19 @@ struct CreateRequest {
   std::wstring suggested;
 };
 int px(int v) { return MulDiv(v,dpi,96); }
+void applyViewPreferences(){
+  const wchar_t* families[]={L"Segoe UI",L"Malgun Gothic",L"Gulim"};const int sizes[]={12,14,16,18,20};
+  HFONT next=CreateFontW(-px(sizes[preferences.fontSize]),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,families[preferences.fontFamily]);
+  if(next){EnumChildWindows(window,[](HWND child,LPARAM value)->BOOL{SendMessageW(child,WM_SETFONT,static_cast<WPARAM>(value),TRUE);return TRUE;},reinterpret_cast<LPARAM>(next));auto previous=font;font=next;if(previous)DeleteObject(previous);}
+  const int widths[]={120,120,170,60};for(int column=1;column<5;++column)ListView_SetColumnWidth(list,column,(preferences.columnMask&(1<<(column-1)))?px(widths[column-1]):0);
+}
 std::wstring text(HWND control) {
   int n=GetWindowTextLengthW(control); std::wstring s(n+1,L'\0');
   GetWindowTextW(control,s.data(),n+1); s.resize(n); return s;
 }
 HWND control(const wchar_t* cls,const wchar_t* title,DWORD style,int id=0) {
-  HWND item=CreateWindowExW(0,cls,title,WS_CHILD|WS_VISIBLE|style,0,0,1,1,window,reinterpret_cast<HMENU>(static_cast<intptr_t>(id)),nullptr,nullptr);
+  auto translated=kz::ui::label(title);
+  HWND item=CreateWindowExW(0,cls,translated.c_str(),WS_CHILD|WS_VISIBLE|style,0,0,1,1,window,reinterpret_cast<HMENU>(static_cast<intptr_t>(id)),nullptr,nullptr);
   SendMessageW(item,WM_SETFONT,reinterpret_cast<WPARAM>(font),TRUE); return item;
 }
 std::vector<kz::fs::path> choose(bool folder,bool multiple=false,bool save=false,const std::wstring& name=L"",HWND owner=nullptr) {
@@ -112,13 +144,14 @@ void layout() {
   MoveWindow(logo,px(20),px(20),px(60),px(60),TRUE);
   MoveWindow(statusText,px(15),h-px(28),std::max(px(100),w-px(30)),px(24),TRUE);
   const int ids[]={Open,CreateFiles,CreateFolder,Extract,Test,Cancel,Refresh,Home};
-  for(int i=0;i<8;++i)MoveWindow(GetDlgItem(window,ids[i]+1000),px(10+i*86),px(12),px(80),px(30),TRUE);
-  MoveWindow(pathText,px(12),px(56),w-px(24),px(24),TRUE);
-  MoveWindow(passwordLabel,px(12),px(91),px(70),px(24),TRUE);
-  MoveWindow(password,px(85),px(86),px(220),px(28),TRUE);
+  for(int i=0;i<8;++i){auto button=GetDlgItem(window,ids[i]+1000);MoveWindow(button,px(10+i*86),px(12),px(80),px(30),TRUE);ShowWindow(button,!home&&preferences.showToolbar?SW_SHOW:SW_HIDE);}
+  const int offset=preferences.showToolbar?0:-42;
+  MoveWindow(pathText,px(12),px(56+offset),w-px(24),px(24),TRUE);
+  MoveWindow(passwordLabel,px(12),px(91+offset),px(70),px(24),TRUE);
+  MoveWindow(password,px(85),px(86+offset),px(220),px(28),TRUE);
   int treeWidth=treeVisible?px(220):0;
-  MoveWindow(tree,px(12),px(124),px(212),std::max(px(60),h-px(170)),TRUE);
-  MoveWindow(list,px(12)+treeWidth,px(124),std::max(px(100),w-px(24)-treeWidth),std::max(px(60),h-px(170)),TRUE);
+  MoveWindow(tree,px(12),px(124+offset),px(212),std::max(px(60),h-px(170+offset)),TRUE);
+  MoveWindow(list,px(12)+treeWidth,px(124+offset),std::max(px(100),w-px(24)-treeWidth),std::max(px(60),h-px(170+offset)),TRUE);
   ShowWindow(tree,!home&&treeVisible?SW_SHOW:SW_HIDE);
 }
 void showHome(bool value) {
@@ -129,12 +162,12 @@ void showHome(bool value) {
 }
 void updateDialog(HWND dialog) {
   int fmt=static_cast<int>(SendDlgItemMessageW(dialog,IDC_FORMAT,CB_GETCURSEL,0,0));
-  bool tar=fmt==2, seven=fmt==1;
-  EnableWindow(GetDlgItem(dialog,IDC_SPLIT),!tar&&fmt!=3);
+  bool tar=fmt==2, seven=fmt==1||fmt==7,stream=fmt>=4&&fmt<=6;
+  EnableWindow(GetDlgItem(dialog,IDC_SPLIT),fmt==0||fmt==1);
   int selected=static_cast<int>(SendDlgItemMessageW(dialog,IDC_SPLIT,CB_GETCURSEL,0,0));
-  EnableWindow(GetDlgItem(dialog,IDC_CUSTOM_SPLIT),!tar&&fmt!=3&&selected==static_cast<int>(kz::customSplitIndex));
-  EnableWindow(GetDlgItem(dialog,IDC_PASSWORD),!tar);
-  EnableWindow(GetDlgItem(dialog,IDC_LEVEL),!tar);
+  EnableWindow(GetDlgItem(dialog,IDC_CUSTOM_SPLIT),(fmt==0||fmt==1)&&selected==static_cast<int>(kz::customSplitIndex));
+  EnableWindow(GetDlgItem(dialog,IDC_PASSWORD),!tar&&!stream&&fmt<8);
+  EnableWindow(GetDlgItem(dialog,IDC_LEVEL),!tar&&fmt<8);
   EnableWindow(GetDlgItem(dialog,IDC_HIDE_NAMES),seven);
   if(!seven)CheckDlgButton(dialog,IDC_HIDE_NAMES,BST_UNCHECKED);
 }
@@ -142,14 +175,14 @@ void suggestOutput(HWND dialog,CreateRequest& request) {
   auto current=text(GetDlgItem(dialog,IDC_OUTPUT));
   if(!current.empty()&&current!=request.suggested)return;
   int fmt=static_cast<int>(SendDlgItemMessageW(dialog,IDC_FORMAT,CB_GETCURSEL,0,0));
-  request.suggested=request.inputs.empty()?L"":kz::suggestedArchive(request.inputs,fmt==1?"7z":fmt==2?"tar":fmt==3?"zpaq":"zip").wstring();
+  request.suggested=request.inputs.empty()?L"":kz::suggestedArchive(request.inputs,extensionForIndex(fmt)).wstring();
   SetDlgItemTextW(dialog,IDC_OUTPUT,request.suggested.c_str());
 }
 INT_PTR CALLBACK createProcedure(HWND dialog,UINT msg,WPARAM wp,LPARAM lp) {
   auto request=reinterpret_cast<CreateRequest*>(GetWindowLongPtrW(dialog,DWLP_USER));
-  if(msg==WM_INITDIALOG) {
+  if(msg==WM_INITDIALOG) {kz::ui::dialog(dialog);
     request=reinterpret_cast<CreateRequest*>(lp);SetWindowLongPtrW(dialog,DWLP_USER,lp);
-    for(auto s:{L"ZIP",L"7Z",L"TAR",L"ZPAQ"})SendDlgItemMessageW(dialog,IDC_FORMAT,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(s));
+    for(auto s:{L"ZIP",L"7Z",L"TAR",L"ZPAQ",L"GZIP (파일 하나)",L"BZIP2 (파일 하나)",L"XZ (파일 하나)",L"SFX (7Z 자체 해제 EXE)",L"WIM (비압축)",L"ISO (폴더 내용)"})SendDlgItemMessageW(dialog,IDC_FORMAT,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(s));
     SendDlgItemMessageW(dialog,IDC_FORMAT,CB_SETCURSEL,0,0);
     for(const auto& preset:kz::splitPresets) {
       auto label=kz::widen(preset.label);SendDlgItemMessageW(dialog,IDC_SPLIT,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(label.c_str()));
@@ -177,7 +210,7 @@ INT_PTR CALLBACK createProcedure(HWND dialog,UINT msg,WPARAM wp,LPARAM lp) {
       if(id==IDC_FORMAT) {
         auto output=kz::fs::path(text(GetDlgItem(dialog,IDC_OUTPUT)));
         int index=static_cast<int>(SendDlgItemMessageW(dialog,IDC_FORMAT,CB_GETCURSEL,0,0));
-        if(!output.empty()){bool automatic=output.wstring()==request->suggested;output.replace_extension(index==1?L".7z":index==2?L".tar":index==3?L".zpaq":L".zip");SetDlgItemTextW(dialog,IDC_OUTPUT,output.c_str());if(automatic)request->suggested=output.wstring();}
+        if(!output.empty()){bool automatic=output.wstring()==request->suggested;output.replace_extension(kz::fs::u8path(std::string(".")+extensionForIndex(index)));SetDlgItemTextW(dialog,IDC_OUTPUT,output.c_str());if(automatic)request->suggested=output.wstring();}
       }
       updateDialog(dialog);return TRUE;
     }
@@ -194,18 +227,19 @@ INT_PTR CALLBACK createProcedure(HWND dialog,UINT msg,WPARAM wp,LPARAM lp) {
     if(id==IDC_BROWSE_OUTPUT) {
       int fmt=static_cast<int>(SendDlgItemMessageW(dialog,IDC_FORMAT,CB_GETCURSEL,0,0));
       auto output=text(GetDlgItem(dialog,IDC_OUTPUT));
-      auto files=choose(false,false,true,output.empty()?kz::suggestedArchive(request->inputs,fmt==1?"7z":fmt==2?"tar":fmt==3?"zpaq":"zip").filename().wstring():output,dialog);
+      auto files=choose(false,false,true,output.empty()?kz::suggestedArchive(request->inputs,extensionForIndex(fmt)).filename().wstring():output,dialog);
       if(!files.empty())SetDlgItemTextW(dialog,IDC_OUTPUT,files[0].c_str());return TRUE;
     }
     if(id==IDOK) {
       int fmt=static_cast<int>(SendDlgItemMessageW(dialog,IDC_FORMAT,CB_GETCURSEL,0,0));
-      kz::Options options;options.unicodeNames=preferences.unicodeNames;options.storeTimes=preferences.storeTimes;options.excludeThumbs=preferences.excludeThumbs;options.multiThread=preferences.parallel;options.format=fmt==1?"7z":fmt==2?"tar":fmt==3?"zpaq":"zip";
+      kz::Options options;options.unicodeNames=preferences.unicodeNames;options.storeTimes=preferences.storeTimes;options.excludeThumbs=preferences.excludeThumbs;options.multiThread=preferences.parallel;options.format=formatForIndex(fmt);
       int levels[]={0,1,5,9};int level=static_cast<int>(SendDlgItemMessageW(dialog,IDC_LEVEL,CB_GETCURSEL,0,0));
       options.level=levels[std::clamp(level,0,3)];
-      if(fmt!=2) {
+      options.selfExtracting=fmt==7;
+      if(fmt!=2&&!(fmt>=4&&fmt<=6)&&fmt<8) {
         options.password=kz::narrow(text(GetDlgItem(dialog,IDC_PASSWORD)));
-        if(fmt!=3)options.split=kz::splitArgument(static_cast<size_t>(SendDlgItemMessageW(dialog,IDC_SPLIT,CB_GETCURSEL,0,0)),kz::narrow(text(GetDlgItem(dialog,IDC_CUSTOM_SPLIT))));
-        options.hideNames=fmt==1&&IsDlgButtonChecked(dialog,IDC_HIDE_NAMES)==BST_CHECKED;
+        if(fmt==0||fmt==1)options.split=kz::splitArgument(static_cast<size_t>(SendDlgItemMessageW(dialog,IDC_SPLIT,CB_GETCURSEL,0,0)),kz::narrow(text(GetDlgItem(dialog,IDC_CUSTOM_SPLIT))));
+        options.hideNames=(fmt==1||fmt==7)&&IsDlgButtonChecked(dialog,IDC_HIDE_NAMES)==BST_CHECKED;
       }
       auto path=text(GetDlgItem(dialog,IDC_OUTPUT));
       if(path.empty())throw std::runtime_error("저장할 파일 이름을 지정하세요.");
@@ -255,7 +289,7 @@ void displayFolder(const std::string& folder) {
   SendMessageW(list,WM_SETREDRAW,FALSE,0);ListView_DeleteAllItems(list);
   for(size_t i=0;i<visibleEntries.size();++i){
     const auto& e=visibleEntries[i];auto name=e.name.substr(prefix.size());
-    std::wstring values[]={kz::widen((e.directory?"[폴더] ":"")+name),e.directory?L"":std::to_wstring(e.size),e.directory?L"":std::to_wstring(e.packed),kz::widen(e.modified),e.encrypted?L"암호":L""};
+    std::wstring values[]={kz::widen((e.directory?"[폴더] ":"")+kz::composeFilename(name)),e.directory?L"":std::to_wstring(e.size),e.directory?L"":std::to_wstring(e.packed),kz::widen(e.modified),e.encrypted?L"암호":L""};
     LVITEMW item{};item.mask=LVIF_TEXT;item.iItem=static_cast<int>(i);item.pszText=values[0].data();ListView_InsertItem(list,&item);
     for(int j=1;j<5;++j)ListView_SetItemText(list,static_cast<int>(i),j,values[j].data());
   }
@@ -277,7 +311,7 @@ void display(const std::vector<kz::Entry>& entries) {
   for(const auto& folder:folders){
     auto slash=folder.first.rfind('/');auto parent=slash==std::string::npos?"":folder.first.substr(0,slash);
     auto label=slash==std::string::npos?folder.first:folder.first.substr(slash+1);
-    insert(folder.first,kz::widen(label),treeItems.at(parent));
+    insert(folder.first,kz::widen(kz::composeFilename(label)),treeItems.at(parent));
   }
   TreeView_Expand(tree,root,TVE_EXPAND);buildingTree=false;TreeView_SelectItem(tree,root);displayFolder("");
 }
@@ -288,7 +322,7 @@ std::wstring durationText(long long seconds) {
   return std::to_wstring(seconds/60)+L"분 "+std::to_wstring(seconds%60)+L"초";
 }
 INT_PTR CALLBACK progressProcedure(HWND dialog,UINT msg,WPARAM wp,LPARAM) {
-  if(msg==WM_INITDIALOG){
+  if(msg==WM_INITDIALOG){kz::ui::dialog(dialog);
     lastProgress=-2;progressMarquee=false;
     SendDlgItemMessageW(dialog,IDC_PROGRESS_BAR,PBM_SETRANGE32,0,100);
     RECT owner{},rect{},work{};GetWindowRect(window,&owner);GetWindowRect(dialog,&rect);
@@ -337,6 +371,7 @@ void start(std::function<Result()> task,int kind=0,std::function<void(std::strin
   if(!engine)throw std::runtime_error("설정 → 압축 엔진 연결에서 공식 7z.exe를 선택하세요.");
   if(worker.joinable())worker.join();
   engine->configureRead(codePages[preferences.codePageIndex],preferences.parallel,preferences.zone);
+  engine->configureTemporaryDirectory(temporaryFolder);
   passwordRetry=std::move(retry);jobKind=kind;busy=true;engine->resetCancel();for(auto c:controls)EnableWindow(c,FALSE);
   EnableWindow(GetDlgItem(window,Cancel+1000),TRUE);SetWindowTextW(statusText,L"작업 중…  도구 메뉴에서 취소할 수 있습니다.");
   jobStarted=phaseStarted=std::chrono::steady_clock::now();lastPhase=-1;
@@ -411,7 +446,7 @@ void copyNames() {
   CloseClipboard();
 }
 INT_PTR CALLBACK findProcedure(HWND dialog,UINT msg,WPARAM wp,LPARAM) {
-  if(msg==WM_INITDIALOG)return TRUE;
+  if(msg==WM_INITDIALOG){kz::ui::dialog(dialog);return TRUE;}
   if(msg==WM_CLOSE){EndDialog(dialog,IDCANCEL);return TRUE;}
   if(msg!=WM_COMMAND)return FALSE;
   if(LOWORD(wp)==IDCANCEL){EndDialog(dialog,IDCANCEL);return TRUE;}
@@ -450,25 +485,41 @@ void settingsPage(HWND dialog) {
   for(int id:{IDC_PREF_TEST,IDC_PREF_LEVEL,IDC_PREF_UNICODE,IDC_PREF_TIMES,IDC_PREF_THUMBS,IDC_PREF_CLOSE_CREATE})ShowWindow(GetDlgItem(dialog,id),page==4?SW_SHOW:SW_HIDE);
   for(int id:{IDC_ASSOC_LIST,IDC_ASSOC_APPLY,IDC_DEFAULT_APPS,IDC_ASSOC_ALL,IDC_ASSOC_NONE})ShowWindow(GetDlgItem(dialog,id),page==1?SW_SHOW:SW_HIDE);
   for(int id:{IDC_SHELL_INSTALL,IDC_SHELL_REMOVE})ShowWindow(GetDlgItem(dialog,id),page==2?SW_SHOW:SW_HIDE);
-  for(int id:{IDC_PREF_TREE,IDC_PREF_STATUS,IDC_PREF_COLOR})ShowWindow(GetDlgItem(dialog,id),page==5?SW_SHOW:SW_HIDE);
+  for(int id:{IDC_PREF_TREE,IDC_PREF_STATUS,IDC_PREF_COLOR,IDC_PREF_FONT,IDC_PREF_FONT_SIZE,IDC_PREF_COLUMNS})ShowWindow(GetDlgItem(dialog,id),page==5?SW_SHOW:SW_HIDE);
   for(int id:{IDC_PREF_PARALLEL,IDC_PREF_CODEPAGE,IDC_PREF_CLOSE_EXTRACT})ShowWindow(GetDlgItem(dialog,id),page==3?SW_SHOW:SW_HIDE);
   ShowWindow(GetDlgItem(dialog,IDC_PREF_ZONE),page==6?SW_SHOW:SW_HIDE);
-  for(int id:{IDC_PREF_EXPORT,IDC_PREF_IMPORT})ShowWindow(GetDlgItem(dialog,id),page==7?SW_SHOW:SW_HIDE);
+  for(int id:{IDC_PREF_EXPORT,IDC_PREF_IMPORT,IDC_PREF_TEMP,IDC_PREF_TEMP_RESET,IDC_PREF_UPDATE})ShowWindow(GetDlgItem(dialog,id),page==7?SW_SHOW:SW_HIDE);
+  ShowWindow(GetDlgItem(dialog,IDC_PREF_LANGUAGE),page==8?SW_SHOW:SW_HIDE);
   const wchar_t* notes[]={
     L"설정은 현재 Windows 사용자에게 저장됩니다. 확인을 누르면 즉시 적용됩니다.",
     L"확장자를 선택하고 연결 프로그램 등록을 누르면 즉시 적용됩니다. 기본 앱 변경은 Windows 기본 앱 설정에서 선택하세요.",
-    L"등록/제거 버튼은 즉시 적용됩니다. 압축 옵션 창과 파일명.zip 바로 압축 메뉴를 등록합니다.\n\nWindows 11 첫 우클릭 메뉴와 세부 항목 설정은 개발 중입니다.",
+    L"클래식 메뉴 등록/제거는 즉시 적용됩니다. Windows 11 첫 메뉴는 설치 프로그램에서 서명 패키지를 등록합니다. 어린이zip 하위 메뉴에서 압축/해제 명령을 사용할 수 있습니다.",
     L"선택한 폴더에 압축 내용을 직접 해제합니다. 같은 이름은 덮어쓰지 않습니다.\n\nZIP 코드페이지는 기존 ZIP의 파일명 해석에 적용됩니다. UTF-8 표시가 있는 파일은 원래 인코딩을 사용합니다. 멀티코어 활용 범위는 압축 방식에 따라 다릅니다.",
     L"선택한 압축 방법과 검사 옵션이 새 압축 창의 기본값으로 적용됩니다.",
-    L"폴더 트리, 상태 표시줄, 테마 색상을 선택하고 확인하면 저장됩니다. 눈금선과 행 선택은 일반 설정에서 변경합니다.\n\n이미지 미리보기 및 글꼴 선택은 개발 중입니다.",
-    L"해제 전 경로 탈출, 링크, 중복 경로를 검사합니다.\n\n다운로드 출처(Zone.Identifier)를 지원하는 파일 시스템에서 원본 정보를 전달합니다. 악성코드 검사는 아직 구현되지 않았습니다.",
-    L"현재 한도: 항목 100,000개 / 선언된 해제 크기 20 GiB.\n\n환경설정을 INI 텍스트로 내보내거나 가져올 수 있습니다. 암호는 포함하지 않습니다. 임시 폴더 및 상세 성능 설정은 개발 중입니다.",
-    L"한국어\n\n추가 언어 번역은 개발 중입니다."
+    L"폴더 트리, 상태 표시줄, 테마, 파일 목록 글꼴과 크기를 설정합니다. 칼럼 버튼에서 크기/날짜/암호 열 표시를 선택합니다. 이미지·텍스트는 보기 메뉴에서 미리볼 수 있습니다.",
+    L"해제 전 경로 탈출, 링크, 정규화 후 중복 경로를 검사합니다. 다운로드 출처를 보존할 수 있습니다. 파일 메뉴의 Microsoft Defender 검사와 현재 사용자 자격 증명 관리자를 통한 명시적 암호 저장을 지원합니다.",
+    L"현재 한도: 항목 100,000개 / 선언된 해제 크기 20 GiB. 환경설정 INI에는 암호를 포함하지 않습니다. 임시 폴더 경로는 이 PC에만 저장합니다. 해제 결과는 대상 폴더에서 검증 후 이동합니다.",
+    L"한국어 / English\n\n메뉴와 기본 대화상자 언어는 다음 실행부터 적용됩니다. 일부 엔진 오류와 상세 안내는 한국어로 표시될 수 있습니다."
   };
-  SetDlgItemTextW(dialog,IDC_SETTINGS_NOTE,notes[std::clamp(page,0,8)]);
+  const wchar_t* englishNotes[]={
+    L"Preferences are stored for the current Windows user and applied when you choose OK.",
+    L"Register the selected extensions, then choose default apps in Windows Settings.",
+    L"Classic menu registration applies immediately. The installer registers the Windows 11 identity package. Compression and extraction commands appear under EoriniZip.",
+    L"Extract directly to the chosen folder. Existing names get a number. ZIP code pages apply to legacy names; UTF-8 names retain their encoding. macOS decomposed names are composed when extracted.",
+    L"The selected level and test option are defaults for new archives. GZIP/BZIP2/XZ take one file. ISO takes one folder. WIM is stored without compression.",
+    L"Choose the folder tree, status bar, theme, list font and size. The columns button selects size, date and encryption columns. Preview images and text from the View menu.",
+    L"Extraction checks paths, links and Unicode name collisions. Origin information can be preserved. Use File > Microsoft Defender scan and Settings > Save password for explicit current-user credential storage.",
+    L"Limits: 100,000 entries / 20 GiB declared expanded data. INI export excludes passwords. Temporary folder paths are stored only on this PC. Updates require a valid trusted installer signed by the same signer as the installed app.",
+    L"Korean / English. Menu and basic dialog labels change after restarting. Some detailed messages and engine errors can remain Korean."
+  };
+  SetDlgItemTextW(dialog,IDC_SETTINGS_NOTE,(kz::ui::english?englishNotes:notes)[std::clamp(page,0,8)]);
 }
 void fillSettings(HWND dialog,const PreferencesData& p) {
   pendingTheme=p.theme;
+  SendDlgItemMessageW(dialog,IDC_PREF_LANGUAGE,CB_SETCURSEL,p.language,0);
+  CheckDlgButton(dialog,IDC_PREF_UPDATE,p.checkUpdates?BST_CHECKED:BST_UNCHECKED);
+  SendDlgItemMessageW(dialog,IDC_PREF_FONT,CB_SETCURSEL,p.fontFamily,0);SendDlgItemMessageW(dialog,IDC_PREF_FONT_SIZE,CB_SETCURSEL,p.fontSize,0);
+  SetWindowLongPtrW(GetDlgItem(dialog,IDC_PREF_COLUMNS),GWLP_USERDATA,p.columnMask);
   CheckDlgButton(dialog,IDC_PREF_CLOSE_CREATE,p.closeAfterCreate?BST_CHECKED:BST_UNCHECKED);
   CheckDlgButton(dialog,IDC_PREF_CLOSE_EXTRACT,p.closeAfterExtract?BST_CHECKED:BST_UNCHECKED);
   CheckDlgButton(dialog,IDC_PREF_UNICODE,p.unicodeNames?BST_CHECKED:BST_UNCHECKED);
@@ -487,7 +538,11 @@ void fillSettings(HWND dialog,const PreferencesData& p) {
   SendDlgItemMessageW(dialog,IDC_PREF_LEVEL,CB_SETCURSEL,p.level,0);
 }
 INT_PTR CALLBACK settingsProcedure(HWND dialog,UINT msg,WPARAM wp,LPARAM lp) {
-  if(msg==WM_INITDIALOG){
+  if(msg==WM_INITDIALOG){kz::ui::dialog(dialog);
+    SendDlgItemMessageW(dialog,IDC_PREF_LANGUAGE,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(L"한국어"));SendDlgItemMessageW(dialog,IDC_PREF_LANGUAGE,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(L"English"));
+    pendingTemporaryFolder=temporaryFolder;
+    for(auto family:{L"Segoe UI",L"맑은 고딕",L"굴림"})SendDlgItemMessageW(dialog,IDC_PREF_FONT,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(family));
+    for(auto size:{L"글꼴 크기: 12",L"글꼴 크기: 14",L"글꼴 크기: 16",L"글꼴 크기: 18",L"글꼴 크기: 20"})SendDlgItemMessageW(dialog,IDC_PREF_FONT_SIZE,CB_ADDSTRING,0,reinterpret_cast<LPARAM>(size));
     for(auto title:{L"일반 설정",L"파일 연결",L"탐색기 메뉴",L"압축 풀기",L"압축하기",L"보기/편집",L"보안 설정",L"고급 설정",L"언어 설정"})
       SendDlgItemMessageW(dialog,IDC_CATEGORIES,LB_ADDSTRING,0,reinterpret_cast<LPARAM>(title));
     for(auto title:{L"압축하지 않음",L"빠르게",L"보통",L"최대로"})
@@ -527,6 +582,15 @@ INT_PTR CALLBACK settingsProcedure(HWND dialog,UINT msg,WPARAM wp,LPARAM lp) {
     static COLORREF custom[16]{};CHOOSECOLORW choice{sizeof(choice)};choice.hwndOwner=dialog;choice.rgbResult=pendingTheme;choice.lpCustColors=custom;choice.Flags=CC_FULLOPEN|CC_RGBINIT;
     if(ChooseColorW(&choice))pendingTheme=choice.rgbResult;return TRUE;
   }
+  if(LOWORD(wp)==IDC_PREF_TEMP||LOWORD(wp)==IDC_PREF_TEMP_RESET){
+    if(LOWORD(wp)==IDC_PREF_TEMP_RESET)pendingTemporaryFolder.clear();else{auto folders=choose(true,false,false,L"",dialog);if(folders.empty())return TRUE;pendingTemporaryFolder=folders[0];}
+    SetDlgItemTextW(dialog,IDC_SETTINGS_NOTE,(L"확인을 누르면 임시 폴더 설정을 저장합니다: "+(pendingTemporaryFolder.empty()?std::wstring(L"OS 기본 임시 폴더"):pendingTemporaryFolder.wstring())).c_str());return TRUE;
+  }
+  if(LOWORD(wp)==IDC_PREF_COLUMNS){
+    HMENU menu=CreatePopupMenu();const wchar_t* labels[]={L"원본 크기",L"압축 크기",L"수정 날짜",L"암호"};int mask=static_cast<int>(GetWindowLongPtrW(GetDlgItem(dialog,IDC_PREF_COLUMNS),GWLP_USERDATA));
+    for(int i=0;i<4;++i)AppendMenuW(menu,MF_STRING|((mask&(1<<i))?MF_CHECKED:0),i+1,labels[i]);POINT point;GetCursorPos(&point);auto selected=TrackPopupMenu(menu,TPM_RETURNCMD|TPM_NONOTIFY,point.x,point.y,0,dialog,nullptr);DestroyMenu(menu);
+    if(selected>=1&&selected<=4)SetWindowLongPtrW(GetDlgItem(dialog,IDC_PREF_COLUMNS),GWLP_USERDATA,mask^(1<<(selected-1)));return TRUE;
+  }
   if(LOWORD(wp)==IDC_PREF_EXPORT){
     try{
       auto paths=choose(false,false,true,L"EoriniZip-settings.ini",dialog);if(paths.empty())return TRUE;
@@ -550,7 +614,7 @@ INT_PTR CALLBACK settingsProcedure(HWND dialog,UINT msg,WPARAM wp,LPARAM lp) {
       SetDlgItemTextW(dialog,IDC_SETTINGS_NOTE,L"설정을 가져왔습니다. 확인을 누르면 저장되고, 취소하면 기존 설정을 유지합니다.");
     }catch(const std::exception& e){SetDlgItemTextW(dialog,IDC_SETTINGS_NOTE,kz::widen(e.what()).c_str());}return TRUE;
   }
-  if(LOWORD(wp)==IDC_PREF_RESET){fillSettings(dialog,PreferencesData{});return TRUE;}
+  if(LOWORD(wp)==IDC_PREF_RESET){fillSettings(dialog,PreferencesData{});pendingTemporaryFolder.clear();return TRUE;}
   if(LOWORD(wp)==IDCANCEL){EndDialog(dialog,IDCANCEL);return TRUE;}
   if(LOWORD(wp)==IDOK){
     auto previous=preferences;
@@ -568,7 +632,13 @@ INT_PTR CALLBACK settingsProcedure(HWND dialog,UINT msg,WPARAM wp,LPARAM lp) {
     preferences.startHome=IsDlgButtonChecked(dialog,IDC_PREF_HOME)==BST_CHECKED;
     preferences.test=IsDlgButtonChecked(dialog,IDC_PREF_TEST)==BST_CHECKED;
     preferences.level=static_cast<int>(SendDlgItemMessageW(dialog,IDC_PREF_LEVEL,CB_GETCURSEL,0,0));
+    preferences.checkUpdates=IsDlgButtonChecked(dialog,IDC_PREF_UPDATE)==BST_CHECKED;
+    preferences.language=std::clamp(static_cast<int>(SendDlgItemMessageW(dialog,IDC_PREF_LANGUAGE,CB_GETCURSEL,0,0)),0,1);
+    preferences.fontFamily=std::clamp(static_cast<int>(SendDlgItemMessageW(dialog,IDC_PREF_FONT,CB_GETCURSEL,0,0)),0,2);preferences.fontSize=std::clamp(static_cast<int>(SendDlgItemMessageW(dialog,IDC_PREF_FONT_SIZE,CB_GETCURSEL,0,0)),0,4);preferences.columnMask=static_cast<int>(GetWindowLongPtrW(GetDlgItem(dialog,IDC_PREF_COLUMNS),GWLP_USERDATA));
     if(!savePreferences()){preferences=previous;MessageBoxW(dialog,L"환경 설정을 저장할 수 없습니다.",L"어린이zip",MB_OK|MB_ICONERROR);return TRUE;}
+    try{kz::win::registryString(preferencesKey,L"TemporaryFolder",pendingTemporaryFolder.wstring());temporaryFolder=pendingTemporaryFolder;}catch(const std::exception& e){MessageBoxW(dialog,kz::widen(e.what()).c_str(),L"어린이zip",MB_OK|MB_ICONERROR);return TRUE;}
+    applyViewPreferences();
+    if(preferences.language!=previous.language)MessageBoxW(dialog,L"언어 설정은 다음 실행부터 적용됩니다.",L"어린이zip",MB_OK|MB_ICONINFORMATION);
     ListView_SetExtendedListViewStyle(list,LVS_EX_DOUBLEBUFFER|(preferences.fullRow?LVS_EX_FULLROWSELECT:0)|(preferences.grid?LVS_EX_GRIDLINES:0));
     treeVisible=preferences.showTree;statusVisible=preferences.showStatus;ShowWindow(statusText,statusVisible?SW_SHOW:SW_HIDE);layout();InvalidateRect(window,nullptr,TRUE);
     EndDialog(dialog,IDOK);return TRUE;
@@ -576,7 +646,7 @@ INT_PTR CALLBACK settingsProcedure(HWND dialog,UINT msg,WPARAM wp,LPARAM lp) {
   return FALSE;
 }
 INT_PTR CALLBACK decryptProcedure(HWND dialog,UINT msg,WPARAM wp,LPARAM lp) {
-  if(msg==WM_INITDIALOG){SetWindowLongPtrW(dialog,DWLP_USER,lp);SendDlgItemMessageW(dialog,IDC_PASSWORD,EM_SETLIMITTEXT,4096,0);return TRUE;}
+  if(msg==WM_INITDIALOG){kz::ui::dialog(dialog);SetWindowLongPtrW(dialog,DWLP_USER,lp);SendDlgItemMessageW(dialog,IDC_PASSWORD,EM_SETLIMITTEXT,4096,0);return TRUE;}
   if(msg==WM_CLOSE||(msg==WM_COMMAND&&LOWORD(wp)==IDCANCEL)){SetDlgItemTextW(dialog,IDC_PASSWORD,L"");EndDialog(dialog,IDCANCEL);return TRUE;}
   if(msg==WM_COMMAND&&LOWORD(wp)==IDOK){
     auto value=text(GetDlgItem(dialog,IDC_PASSWORD));if(value.empty())return TRUE;
@@ -593,7 +663,7 @@ bool askArchivePassword(std::wstring& secret) {
   start([input,passwordValue=std::move(passwordValue)]{return Result{{},false,"EasyCrypt 해제 및 무결성 검사 완료: "+engine->decryptEasyCrypt(input,kz::fs::absolute(input).parent_path(),passwordValue).u8string()};},2);
 }
 INT_PTR CALLBACK renameProcedure(HWND dialog,UINT msg,WPARAM wp,LPARAM lp){
-  if(msg==WM_INITDIALOG){SetWindowLongPtrW(dialog,DWLP_USER,lp);auto value=reinterpret_cast<std::wstring*>(lp);SetDlgItemTextW(dialog,IDC_RENAME_TEXT,value->c_str());SendDlgItemMessageW(dialog,IDC_RENAME_TEXT,EM_SETLIMITTEXT,255,0);return TRUE;}
+  if(msg==WM_INITDIALOG){kz::ui::dialog(dialog);SetWindowLongPtrW(dialog,DWLP_USER,lp);auto value=reinterpret_cast<std::wstring*>(lp);SetDlgItemTextW(dialog,IDC_RENAME_TEXT,value->c_str());SendDlgItemMessageW(dialog,IDC_RENAME_TEXT,EM_SETLIMITTEXT,255,0);return TRUE;}
   if(msg==WM_CLOSE||(msg==WM_COMMAND&&LOWORD(wp)==IDCANCEL)){EndDialog(dialog,IDCANCEL);return TRUE;}
   if(msg==WM_COMMAND&&LOWORD(wp)==IDOK){auto value=text(GetDlgItem(dialog,IDC_RENAME_TEXT));if(value.empty()||value.find_first_of(L"/\\")!=std::wstring::npos)return TRUE;*reinterpret_cast<std::wstring*>(GetWindowLongPtrW(dialog,DWLP_USER))=value;EndDialog(dialog,IDOK);return TRUE;}return FALSE;
 }
@@ -602,8 +672,8 @@ void previewTask(const kz::fs::path& input,const std::string& name,const std::st
     auto entries=engine->list(input,secret);auto found=std::find_if(entries.begin(),entries.end(),[&](const auto& e){return normalized(e.name)==normalized(name);});
     if(found==entries.end()||found->directory||found->size>32*1024*1024)throw std::runtime_error("미리보기 항목이 없거나 32 MiB 한도를 초과했습니다.");
     if(found->encrypted&&secret.empty())throw kz::PasswordRequired("미리보기에 암호가 필요합니다.");
-    auto relative=kz::fs::u8path(normalized(name));if(!kz::win::imagePreview(relative)&&!kz::win::textPreview(relative))throw std::runtime_error("이미지(PNG/JPG/BMP/GIF)와 텍스트 파일만 미리보기할 수 있습니다.");
-    kz::fs::path root;for(int n=0;n<100;++n){auto candidate=kz::fs::temp_directory_path()/("eorinizip-preview-"+std::to_string(GetCurrentProcessId())+"-"+std::to_string(GetTickCount64())+"-"+std::to_string(n));if(kz::fs::create_directory(candidate)){root=candidate;break;}}
+    auto relative=kz::fs::u8path(kz::composeFilename(normalized(name)));if(!kz::win::imagePreview(relative)&&!kz::win::textPreview(relative))throw std::runtime_error("이미지(PNG/JPG/BMP/GIF)와 텍스트 파일만 미리보기할 수 있습니다.");
+    kz::fs::path root;for(int n=0;n<100;++n){auto candidate=engine->temporaryDirectory()/("eorinizip-preview-"+std::to_string(GetCurrentProcessId())+"-"+std::to_string(GetTickCount64())+"-"+std::to_string(n));if(kz::fs::create_directory(candidate)){root=candidate;break;}}
     if(root.empty())throw std::runtime_error("미리보기 임시 폴더를 만들 수 없습니다.");
     try{engine->extract(input,root,secret,{name});Result result;result.message="미리보기 준비 완료";result.previewRoot=root;result.previewFile=root/relative;return result;}
     catch(...){std::error_code ec;kz::fs::remove_all(root,ec);throw;}
@@ -611,6 +681,42 @@ void previewTask(const kz::fs::path& input,const std::string& name,const std::st
 }
 void editTask(const kz::fs::path& input,const std::string& action,const std::vector<std::string>& names,const std::string& secret){
   start([=]{engine->edit(input,action,names,secret);return Result{engine->list(input,secret),true,"압축 파일 수정 및 검사 완료"};},1,[=](std::string next){SetWindowTextW(password,kz::widen(next).c_str());editTask(input,action,names,next);});
+}
+INT_PTR CALLBACK commentProcedure(HWND dialog,UINT message,WPARAM wp,LPARAM lp){
+  if(message==WM_INITDIALOG){kz::ui::dialog(dialog);SetWindowLongPtrW(dialog,DWLP_USER,lp);SetDlgItemTextW(dialog,IDC_COMMENT_TEXT,reinterpret_cast<std::wstring*>(lp)->c_str());SendDlgItemMessageW(dialog,IDC_COMMENT_TEXT,EM_SETLIMITTEXT,65535,0);return TRUE;}
+  if(message==WM_CLOSE||(message==WM_COMMAND&&LOWORD(wp)==IDCANCEL)){EndDialog(dialog,IDCANCEL);return TRUE;}
+  if(message==WM_COMMAND&&LOWORD(wp)==IDOK){*reinterpret_cast<std::wstring*>(GetWindowLongPtrW(dialog,DWLP_USER))=text(GetDlgItem(dialog,IDC_COMMENT_TEXT));EndDialog(dialog,IDOK);return TRUE;}return FALSE;
+}
+void commentTask(const kz::fs::path& input,const std::string& value,const std::string& secret){
+  start([=]{engine->setComment(input,value,secret);return Result{{},false,"ZIP 설명 저장 및 무결성 검사 완료"};},1,[=](std::string next){SetWindowTextW(password,kz::widen(next).c_str());commentTask(input,value,next);});
+}
+kz::fs::path taskFolder(){
+  for(int n=0;n<100;++n){auto path=engine->temporaryDirectory()/("eorinizip-transfer-"+std::to_string(GetCurrentProcessId())+"-"+std::to_string(GetTickCount64())+"-"+std::to_string(n));if(kz::fs::create_directory(path))return path;}
+  throw std::runtime_error("임시 폴더를 만들 수 없습니다.");
+}
+void transferTask(const kz::fs::path& input,const std::vector<std::string>& names,const std::string& secret,bool edit){
+  start([=]{
+    const auto size=kz::fs::file_size(input);const auto stamp=kz::fs::last_write_time(input);
+    auto entries=engine->list(input,secret);
+    if(edit){auto found=std::find_if(entries.begin(),entries.end(),[&](const auto& e){return normalized(e.name)==normalized(names[0]);});
+      if(found==entries.end()||found->directory||found->size>32*1024*1024||!kz::win::textPreview(kz::fs::u8path(found->name)))throw std::runtime_error("외부 편집은 32 MiB 이하 텍스트 파일 하나를 선택하세요.");}
+    auto root=taskFolder();
+    try{
+      engine->extract(input,root,secret,names);Result result;result.message="클립보드에 파일 복사 완료 (프로그램을 열어 둔 상태에서 붙여넣으세요)";
+      if(edit){result.editFile=root/kz::fs::u8path(kz::composeFilename(normalized(names[0])));result.editRoot=root;result.editName=names[0];result.editArchive=input;result.editPassword=secret;result.editSize=size;result.editStamp=stamp;}
+      else result.clipboardRoot=root;
+      return result;
+    }catch(...){std::error_code ec;kz::fs::remove_all(root,ec);throw;}
+  },0,[=](std::string next){SetWindowTextW(password,kz::widen(next).c_str());transferTask(input,names,next,edit);});
+}
+void launchUpdateCheck(bool quiet){
+  auto script=kz::fs::path(kz::win::executablePath()).parent_path()/L"check-updates.ps1";
+  if(!kz::fs::is_regular_file(script))throw std::runtime_error("업데이트 확인 스크립트가 설치 폴더에 없습니다.");
+  wchar_t system[MAX_PATH];GetSystemDirectoryW(system,MAX_PATH);auto powershell=kz::fs::path(system)/L"WindowsPowerShell/v1.0/powershell.exe";
+  auto line=kz::quoteWindows(powershell.wstring())+L" -NoProfile -ExecutionPolicy Bypass -File "+kz::quoteWindows(script.wstring())+L" -CurrentVersion 0.5.1"+(quiet?L" -Quiet":L"");
+  STARTUPINFOW startup{sizeof(startup)};PROCESS_INFORMATION process{};
+  if(!CreateProcessW(powershell.c_str(),line.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,nullptr,nullptr,&startup,&process))throw std::runtime_error("업데이트 확인을 시작할 수 없습니다.");
+  CloseHandle(process.hProcess);CloseHandle(process.hThread);
 }
 bool easyCryptFile(const kz::fs::path& file){auto ext=file.extension().wstring();return _wcsicmp(ext.c_str(),L".ezc")==0;}void command(int id) {
   if(id==Cancel){if(engine)engine->cancel();return;}
@@ -620,9 +726,12 @@ bool easyCryptFile(const kz::fs::path& file){auto ext=file.extension().wstring()
     if(id==RecentClear){recentFiles.clear();RegDeleteTreeW(HKEY_CURRENT_USER,L"Software\\EoriniZip\\Recent");return;}
     if(id==NewAdminWindow){auto executable=kz::win::executablePath();ShellExecuteW(window,L"runas",executable.c_str(),nullptr,nullptr,SW_SHOWNORMAL);return;}
     if(id==ToggleTree){treeVisible=!treeVisible;preferences.showTree=treeVisible;if(!savePreferences())throw std::runtime_error("설정을 저장할 수 없습니다.");layout();return;}
+    if(id==ToggleToolbar){preferences.showToolbar=!preferences.showToolbar;if(!savePreferences())throw std::runtime_error("설정을 저장할 수 없습니다.");layout();return;}
+    if(id==CheckUpdates){launchUpdateCheck(false);return;}
+    if(id==ViewSettings){DialogBoxParamW(GetModuleHandleW(nullptr),MAKEINTRESOURCEW(IDD_SETTINGS),window,settingsProcedure,5);return;}
     if(id==Preferences||id==ColorSettings){DialogBoxParamW(GetModuleHandleW(nullptr),MAKEINTRESOURCEW(IDD_SETTINGS),window,settingsProcedure,id==ColorSettings?5:0);return;}
     if(id==Exit){SendMessageW(window,WM_CLOSE,0,0);return;}
-    if(id==About){MessageBoxW(window,L"어린이zip 0.5 · 네이티브 개발 버전\n\nZIP / 7Z / TAR 압축 및 해제\nALZ / EGG / RAR 해제, ZPAQ 압축·해제\nEasyCrypt 2.4 복호화\n\n분할 메뉴의 서비스 이름은 용량 프리셋이며 현재 서비스의 업로드 한도를 보장하지 않습니다.",L"어린이zip 정보",MB_OK);return;}
+    if(id==About){MessageBoxW(window,L"어린이zip 0.5.1 · 네이티브 개발 버전\n\nZIP / 7Z / TAR 압축 및 해제\nALZ / EGG / RAR 해제, ZPAQ 압축·해제\nEasyCrypt 2.4 복호화\n\n분할 메뉴의 서비스 이름은 용량 프리셋이며 현재 서비스의 업로드 한도를 보장하지 않습니다.",L"어린이zip 정보",MB_OK);return;}
     if(id==Home){showHome(!home);return;}
     if(id==CloseArchive){archive.clear();archiveEntries.clear();visibleEntries.clear();TreeView_DeleteAllItems(tree);ListView_DeleteAllItems(list);SetWindowTextW(pathText,L"");SetWindowTextW(password,L"");showHome(true);return;}
     if(id==Topmost){onTop=!onTop;SetWindowPos(window,onTop?HWND_TOPMOST:HWND_NOTOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE);return;}
@@ -642,6 +751,7 @@ bool easyCryptFile(const kz::fs::path& file){auto ext=file.extension().wstring()
     if(id==CopyNames){copyNames();return;}
     if(id==Connect){auto files=choose(false);if(files.empty())return;engine=std::make_unique<kz::Engine>(files[0]);SetWindowTextW(statusText,L"7-Zip 엔진 연결됨");return;}
     if(id==DecryptEasy){auto files=choose(false);if(!files.empty())decryptFile(files[0]);return;}
+    if(id==RepairZip){auto files=choose(false);if(files.empty())return;auto folders=choose(true);if(folders.empty())return;auto input=files[0],parent=folders[0];start([=]{return Result{{},false,"ZIP 로컬 항목 복구 및 검사 완료: "+engine->repairZip(input,parent).u8string()};},3);return;}
     if(id==Open){auto files=choose(false);if(files.empty())return;if(easyCryptFile(files[0])){decryptFile(files[0]);return;}archive=files[0];SetWindowTextW(password,L"");ListView_DeleteAllItems(list);SetWindowTextW(pathText,archive.c_str());reload();return;}
     if(id==Refresh){reload();return;}
     if(id==CreateFiles){createArchive();return;}
@@ -662,6 +772,43 @@ bool easyCryptFile(const kz::fs::path& file){auto ext=file.extension().wstring()
       SetWindowTextW(statusText,L"다른 이름으로 저장 완료");return;
     }
     const auto p=kz::narrow(text(password));const auto input=archive;
+    if(id==SavePassword){
+      auto secret=p;if(secret.empty()){std::wstring value;if(!askArchivePassword(value))return;secret=kz::narrow(value);SecureZeroMemory(value.data(),value.size()*sizeof(wchar_t));}
+      if(MessageBoxW(window,L"현재 압축 파일의 암호를 이 Windows 사용자의 자격 증명 관리자에 저장할까요? INI 설정 파일에는 포함하지 않습니다.",L"암호 저장",MB_YESNO|MB_ICONQUESTION)==IDYES){kz::win::saveArchivePassword(input,secret);SetWindowTextW(statusText,L"현재 사용자 자격 증명 관리자에 암호를 저장했습니다.");}
+      SecureZeroMemory(secret.data(),secret.size());return;
+    }
+    if(id==LoadPassword){auto secret=kz::win::loadArchivePassword(input);SetWindowTextW(password,kz::widen(secret).c_str());SecureZeroMemory(secret.data(),secret.size());reload();return;}
+    if(id==DeletePassword){if(MessageBoxW(window,L"이 압축 파일에 저장한 암호를 자격 증명 관리자에서 삭제할까요?",L"저장 암호 삭제",MB_YESNO|MB_ICONQUESTION)==IDYES){kz::win::deleteArchivePassword(input);SetWindowTextW(statusText,L"저장 암호를 삭제했습니다.");}return;}
+    if(id==RecoverPassword){
+      auto files=choose(false);if(files.empty())return;auto candidatesFile=files[0];
+      start([=]{
+        if(kz::fs::file_size(candidatesFile)>4*1024*1024)throw std::runtime_error("암호 후보 파일은 UTF-8 텍스트 4 MiB 이하로 선택하세요.");
+        std::ifstream file(candidatesFile,std::ios::binary);if(!file)throw std::runtime_error("암호 후보 파일을 읽을 수 없습니다.");
+        std::vector<std::string> candidates;std::string line;bool first=true;
+        while(std::getline(file,line)){if(first&&line.compare(0,3,"\xef\xbb\xbf")==0)line.erase(0,3);first=false;if(!line.empty()&&line.back()=='\r')line.pop_back();kz::widen(line);if(!line.empty())candidates.push_back(line);if(candidates.size()>10000)throw std::runtime_error("암호 후보는 10,000개 이하로 지정하세요.");}
+        if(file.bad())throw std::runtime_error("암호 후보 읽기 오류입니다.");
+        Result result;result.recoveredPassword=engine->recoverPassword(input,candidates);result.message="후보 목록에서 암호를 찾아 확인했습니다.";for(auto& candidate:candidates)SecureZeroMemory(candidate.data(),candidate.size());return result;
+      },3);return;
+    }
+    if(id==EditComment){auto value=kz::widen(engine->comment(input));if(DialogBoxParamW(GetModuleHandleW(nullptr),MAKEINTRESOURCEW(IDD_COMMENT),window,commentProcedure,reinterpret_cast<LPARAM>(&value))==IDOK)commentTask(input,kz::narrow(value),p);return;}
+    if(id==ScanArchive){
+      wchar_t programFiles[32768];if(!GetEnvironmentVariableW(L"ProgramFiles",programFiles,32768))throw std::runtime_error("Windows Defender 경로를 찾을 수 없습니다.");
+      auto scanner=kz::fs::path(programFiles)/L"Windows Defender/MpCmdRun.exe";
+      if(!kz::fs::is_regular_file(scanner))throw std::runtime_error("Windows Defender 검사 도구가 설치되지 않았습니다.");
+      start([=]{engine->scanFile(scanner,input);return Result{{},false,"Microsoft Defender 검사 완료: 탐지 보고 없음. 암호화된 내부 파일은 해제 후 별도로 검사하세요."};},3);return;
+    }
+    if(id==CopyFiles||id==ExternalEdit){
+      std::vector<std::string> names;int row=-1;while((row=ListView_GetNextItem(list,row,LVNI_SELECTED))!=-1)names.push_back(visibleEntries.at(static_cast<size_t>(row)).name);
+      if(names.empty()||(id==ExternalEdit&&names.size()!=1))throw std::runtime_error("작업할 항목을 선택하세요. 외부 편집은 파일 하나만 가능합니다.");
+      transferTask(input,names,p,id==ExternalEdit);return;
+    }
+    if(id==PasteFiles){
+      auto files=kz::win::clipboardFiles(window);std::vector<std::string> names;
+      for(const auto& file:files){if(!kz::fs::is_regular_file(file)||kz::fs::is_symlink(file))throw std::runtime_error("붙여넣기는 일반 파일만 지원합니다. 폴더는 새로 압축을 사용하세요.");names.push_back(file.u8string());}
+      if(names.empty())return;
+      if(MessageBoxW(window,L"클립보드의 파일을 압축 파일 최상위에 추가합니다. 같은 내부 이름은 교체됩니다. 계속할까요?",L"파일 붙여넣기",MB_YESNO|MB_ICONQUESTION)==IDYES)editTask(input,"a",names,p);
+      return;
+    }
     if(id==PreviewEntry){int row=ListView_GetNextItem(list,-1,LVNI_SELECTED);if(row<0||ListView_GetNextItem(list,row,LVNI_SELECTED)>=0)throw std::runtime_error("미리볼 파일 하나를 선택하세요.");previewTask(input,visibleEntries.at(row).name,p);return;}
     if(id==AddEntries||id==DeleteEntries||id==RenameEntry){
       std::vector<std::string> names;
@@ -691,30 +838,29 @@ bool easyCryptFile(const kz::fs::path& file){auto ext=file.extension().wstring()
 }
 HMENU menus() {
   HMENU bar=CreateMenu();
-  auto add=[&](const wchar_t* name){HMENU m=CreatePopupMenu();AppendMenuW(bar,MF_POPUP,reinterpret_cast<UINT_PTR>(m),name);return m;};
-  auto item=[](HMENU m,UINT id,const wchar_t* label){AppendMenuW(m,MF_STRING,id,label);};
-  auto pending=[](HMENU m,const wchar_t* label){AppendMenuW(m,MF_STRING|MF_GRAYED,0,label);};
+  auto add=[&](const wchar_t* name){HMENU m=CreatePopupMenu();auto translated=kz::ui::label(name);AppendMenuW(bar,MF_POPUP,reinterpret_cast<UINT_PTR>(m),translated.c_str());return m;};
+  auto item=[](HMENU m,UINT id,const wchar_t* label){auto translated=kz::ui::label(label);AppendMenuW(m,MF_STRING,id,translated.c_str());};
   auto sep=[](HMENU m){AppendMenuW(m,MF_SEPARATOR,0,nullptr);};
   auto file=add(L"파일(&F)");
   item(file,Open,L"압축 파일 열기\tCtrl+O");recentMenu=CreatePopupMenu();AppendMenuW(file,MF_POPUP,reinterpret_cast<UINT_PTR>(recentMenu),L"최근 파일");item(file,CreateFiles,L"새로 압축\tCtrl+N");sep(file);
   item(file,CloseArchive,L"압축 파일 닫기\tF4");item(file,SaveAs,L"다른 이름으로 저장...");
   item(file,DeleteArchive,L"압축 파일 삭제\tCtrl+Del");item(file,DeleteArchivePermanent,L"압축 파일 완전 삭제\tShift+Ctrl+Del");
   item(file,OpenFolder,L"압축 파일이 있는 폴더 열기");item(file,Test,L"압축 파일 테스트\tCtrl+T");
-  pending(file,L"압축 파일 악성코드 검사\tCtrl+I");item(file,Extract,L"압축 풀기\tCtrl+E");item(file,ExtractSelected,L"선택한 항목 풀기...");item(file,ExtractSmart,L"알아서 풀기...");sep(file);
+  item(file,ScanArchive,L"Microsoft Defender로 압축 파일 검사\tCtrl+I");item(file,Extract,L"압축 풀기\tCtrl+E");item(file,ExtractSelected,L"선택한 항목 풀기...");item(file,ExtractSmart,L"알아서 풀기...");sep(file);
   item(file,NewWindow,L"새창 띄우기\tCtrl+Shift+N");item(file,NewAdminWindow,L"새창 띄우기(관리자 권한)\tCtrl+Alt+N");sep(file);item(file,Exit,L"종료\tCtrl+W");
   auto edit=add(L"편집(&E)");
-  item(edit,RenameEntry,L"이름 바꾸기\tF2");item(edit,AddEntries,L"파일 추가\tIns");item(edit,DeleteEntries,L"파일 삭제\tDel");pending(edit,L"압축 파일 설명 편집\tCtrl+Shift+M");sep(edit);
-  pending(edit,L"클립보드로 파일 복사하기\tCtrl+C");pending(edit,L"클립보드에서 파일 붙여 넣기\tCtrl+V");
+  item(edit,RenameEntry,L"이름 바꾸기\tF2");item(edit,AddEntries,L"파일 추가\tIns");item(edit,DeleteEntries,L"파일 삭제\tDel");item(edit,EditComment,L"ZIP 압축 설명 편집\tCtrl+Shift+M");sep(edit);
+  item(edit,CopyFiles,L"클립보드로 파일 복사하기\tCtrl+C");item(edit,PasteFiles,L"클립보드에서 파일 붙여 넣기\tCtrl+V");item(edit,ExternalEdit,L"텍스트 파일 외부 편집 후 반영...");
   item(edit,CopyNames,L"파일의 경로명을 클립보드로 복사");item(edit,SelectAll,L"모두 선택\tCtrl+A");
   auto find=add(L"찾기(&I)");item(find,FindFile,L"파일 찾기\tCtrl+F");
-  auto settings=add(L"설정(&S)");item(settings,Preferences,L"환경 설정\tF5");item(settings,Connect,L"압축 엔진 연결...");pending(settings,L"암호 관리자...");
-  auto view=add(L"보기(&V)");item(view,Home,L"시작 화면\tF6");item(view,ToggleTree,L"트리 컨트롤\tF7");pending(view,L"압축 파일 설명\tF8");
-  item(view,PreviewEntry,L"선택 파일 미리보기");item(view,ToggleStatus,L"상태 표시줄");pending(view,L"툴바");pending(view,L"파일 목록");pending(view,L"칼럼 설정");sep(view);
+  auto settings=add(L"설정(&S)");item(settings,Preferences,L"환경 설정\tF5");item(settings,Connect,L"압축 엔진 연결...");sep(settings);item(settings,SavePassword,L"현재 파일 암호 저장...");item(settings,LoadPassword,L"저장한 암호 불러오기");item(settings,DeletePassword,L"현재 파일 저장 암호 삭제...");
+  auto view=add(L"보기(&V)");item(view,Home,L"시작 화면\tF6");item(view,ToggleTree,L"트리 컨트롤\tF7");item(view,EditComment,L"ZIP 압축 설명\tF8");
+  item(view,PreviewEntry,L"선택 파일 미리보기");item(view,ToggleStatus,L"상태 표시줄");item(view,ToggleToolbar,L"툴바");item(view,ViewSettings,L"파일 목록 글꼴/칼럼 설정...");sep(view);
   item(view,Topmost,L"항상 위에 표시");item(view,ColorSettings,L"색상 설정...");item(view,Refresh,L"압축 파일 다시 읽기");
-  auto tools=add(L"도구(&T)");pending(tools,L"손상된 압축 파일 복구...");pending(tools,L"압축 파일 암호 복구...");sep(tools);
+  auto tools=add(L"도구(&T)");item(tools,RepairZip,L"ZIP 중앙 디렉터리 복구 (비암호화 store/deflate)...");item(tools,RecoverPassword,L"암호 후보 목록으로 복구 (UTF-8, 한 줄에 하나)...");sep(tools);
   item(tools,DecryptEasy,L"EasyCrypt 2.4 파일 해제...");sep(tools);item(tools,Cancel,L"작업 취소");
   auto help=add(L"도움말(&A)");item(help,About,L"정보\tF1");item(help,AppFolder,L"프로그램 설치 폴더 열기");sep(help);
-  item(help,HelpPage,L"도움말 페이지 열기");item(help,IssuesPage,L"문의 / 오류 신고");item(help,Website,L"홈페이지 열기");return bar;
+  item(help,HelpPage,L"도움말 페이지 열기");item(help,CheckUpdates,L"업데이트 확인...");item(help,IssuesPage,L"문의 / 오류 신고");item(help,Website,L"홈페이지 열기");return bar;
 }
 void updateMenus() {
   if(recentMenu){while(GetMenuItemCount(recentMenu)>0)DeleteMenu(recentMenu,0,MF_BYPOSITION);
@@ -722,15 +868,17 @@ void updateMenus() {
     AppendMenuW(recentMenu,MF_STRING|(busy||recentFiles.empty()?MF_GRAYED:0),RecentClear,L"최근 파일 목록 지우기");
   }
   HMENU m=GetMenu(window);
-  for(int id=Open;id<=PreviewEntry;++id)EnableMenuItem(m,id,MF_BYCOMMAND|(busy&&id!=Cancel?MF_GRAYED:MF_ENABLED));
-  for(int id:{PreviewEntry,DeleteArchive,DeleteArchivePermanent,CloseArchive,SaveAs,OpenFolder,Test,Extract,ExtractSelected,ExtractSmart,FindFile,SelectAll,CopyNames,Refresh})
+  for(int id=Open;id<=LastCommand;++id)EnableMenuItem(m,id,MF_BYCOMMAND|(busy&&id!=Cancel?MF_GRAYED:MF_ENABLED));
+  for(int id:{SavePassword,LoadPassword,DeletePassword,RecoverPassword,ScanArchive,CopyFiles,PreviewEntry,DeleteArchive,DeleteArchivePermanent,CloseArchive,SaveAs,OpenFolder,Test,Extract,ExtractSelected,ExtractSmart,FindFile,SelectAll,CopyNames,Refresh})
     EnableMenuItem(m,id,MF_BYCOMMAND|(!busy&&!archive.empty()?MF_ENABLED:MF_GRAYED));
   bool editable=!busy&&(archive.extension()==L".zip"||archive.extension()==L".7z"||archive.extension()==L".ZIP"||archive.extension()==L".7Z");
-  for(int id:{AddEntries,DeleteEntries,RenameEntry})EnableMenuItem(m,id,MF_BYCOMMAND|(editable?MF_ENABLED:MF_GRAYED));
+  for(int id:{AddEntries,DeleteEntries,RenameEntry,PasteFiles,ExternalEdit})EnableMenuItem(m,id,MF_BYCOMMAND|(editable?MF_ENABLED:MF_GRAYED));
+  EnableMenuItem(m,EditComment,MF_BYCOMMAND|(!busy&&_wcsicmp(archive.extension().c_str(),L".zip")==0?MF_ENABLED:MF_GRAYED));
   CheckMenuItem(m,ToggleTree,MF_BYCOMMAND|(treeVisible?MF_CHECKED:MF_UNCHECKED));
   CheckMenuItem(m,Home,MF_BYCOMMAND|(home?MF_CHECKED:MF_UNCHECKED));
   CheckMenuItem(m,Topmost,MF_BYCOMMAND|(onTop?MF_CHECKED:MF_UNCHECKED));
   CheckMenuItem(m,ToggleStatus,MF_BYCOMMAND|(statusVisible?MF_CHECKED:MF_UNCHECKED));
+  CheckMenuItem(m,ToggleToolbar,MF_BYCOMMAND|(preferences.showToolbar?MF_CHECKED:MF_UNCHECKED));
 }void paintHomeButton(DRAWITEMSTRUCT* d) {
   HDC dc=d->hDC;RECT r=d->rcItem;
   auto brush=CreateSolidBrush(d->itemState&ODS_SELECTED?RGB(255,241,184):RGB(255,255,250));
@@ -752,6 +900,7 @@ LRESULT CALLBACK procedure(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp) {
       window=hwnd;DragAcceptFiles(hwnd,TRUE);
       for(int i=0;i<10;++i){wchar_t value[32768]{};DWORD size=sizeof(value);auto name=std::to_wstring(i);if(RegGetValueW(HKEY_CURRENT_USER,L"Software\\EoriniZip\\Recent",name.c_str(),RRF_RT_REG_SZ,nullptr,value,&size)==ERROR_SUCCESS)recentFiles.emplace_back(value);}
       loadPreferences();treeVisible=preferences.showTree;statusVisible=preferences.showStatus;HDC dc=GetDC(hwnd);dpi=GetDeviceCaps(dc,LOGPIXELSX);ReleaseDC(hwnd,dc);
+      SetWindowTextW(hwnd,L"어린이zip");
       font=CreateFontW(-px(14),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,L"Segoe UI");
       footerBrush=CreateSolidBrush(RGB(174,125,13));SetMenu(hwnd,menus());
       logo=control(L"STATIC",L"",SS_ICON);SendMessageW(logo,STM_SETICON,reinterpret_cast<WPARAM>(LoadImageW(GetModuleHandleW(nullptr),MAKEINTRESOURCEW(1),IMAGE_ICON,px(60),px(60),LR_SHARED)),0);
@@ -769,9 +918,10 @@ LRESULT CALLBACK procedure(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp) {
       list=control(WC_LISTVIEWW,L"",LVS_REPORT|LVS_SHOWSELALWAYS|WS_BORDER|WS_TABSTOP);
       ListView_SetExtendedListViewStyle(list,LVS_EX_DOUBLEBUFFER|(preferences.fullRow?LVS_EX_FULLROWSELECT:0)|(preferences.grid?LVS_EX_GRIDLINES:0));
       const wchar_t* columns[]={L"이름",L"원본 크기 (B)",L"압축 크기 (B)",L"수정 날짜",L"암호"};int widths[]={280,120,120,170,60};
-      for(int i=0;i<5;++i){LVCOLUMNW c{};c.mask=LVCF_TEXT|LVCF_WIDTH;c.pszText=const_cast<wchar_t*>(columns[i]);c.cx=px(widths[i]);ListView_InsertColumn(list,i,&c);}
+      for(int i=0;i<5;++i){auto label=kz::ui::label(columns[i]);LVCOLUMNW c{};c.mask=LVCF_TEXT|LVCF_WIDTH;c.pszText=label.data();c.cx=px(widths[i]);ListView_InsertColumn(list,i,&c);}
       workspace.insert(workspace.end(),{pathText,passwordLabel,password,tree,list});controls.insert(controls.end(),{homeOpen,homeCreate,password});
       statusText=control(L"STATIC",L"어린이zip · 설정 메뉴에서 압축 엔진을 연결하세요.",SS_LEFT|SS_PATHELLIPSIS);
+      applyViewPreferences();
       wchar_t executablePath[32768];GetModuleFileNameW(nullptr,executablePath,32768);auto appDir=kz::fs::path(executablePath).parent_path();
       for(const auto& candidate:{appDir/L"7zip/7z.exe",appDir.parent_path()/L"vendor/7zip/7z.exe",kz::fs::path(L"C:/Program Files/7-Zip/7z.exe")})
         if(kz::fs::exists(candidate)){engine=std::make_unique<kz::Engine>(candidate);SetWindowTextW(statusText,L"어린이zip · 압축파일을 열거나 새로 압축해 보세요.");break;}
@@ -814,6 +964,7 @@ LRESULT CALLBACK procedure(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp) {
           }
         }catch(const std::exception& e){SetWindowTextW(statusText,kz::widen(e.what()).c_str());}
       }
+      if(preferences.checkUpdates&&argc<2)try{launchUpdateCheck(true);}catch(...){}
       if(argv)LocalFree(argv);return 0;
     }
     case WM_DROPFILES:{
@@ -845,11 +996,40 @@ LRESULT CALLBACK procedure(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp) {
     case WM_INITMENUPOPUP:updateMenus();return 0;
     case WM_COMMAND:{
       int id=LOWORD(wp);if(id>=Open+1000&&id<=Home+1000)id-=1000;
-      if((HIWORD(wp)==0||HIWORD(wp)==1)&&((id>=Open&&id<=PreviewEntry)||(id>=RecentFirst&&id<=RecentClear)))command(id);return 0;
+      if((HIWORD(wp)==0||HIWORD(wp)==1)&&((id>=Open&&id<=LastCommand)||(id>=RecentFirst&&id<=RecentClear)))command(id);return 0;
     }
     case Finished:{
       std::unique_ptr<Result> result(reinterpret_cast<Result*>(lp));if(worker.joinable())worker.join();busy=false;
       for(auto c:controls)EnableWindow(c,TRUE);if(result->listing){rememberArchive();showHome(false);display(result->entries);}
+      if(!result->recoveredPassword.empty()){
+        if(progressWindow){KillTimer(progressWindow,1);DestroyWindow(progressWindow);progressWindow=nullptr;}EnableWindow(window,TRUE);
+        SetWindowTextW(password,kz::widen(result->recoveredPassword).c_str());SecureZeroMemory(result->recoveredPassword.data(),result->recoveredPassword.size());reload();return 0;
+      }
+      if(!result->clipboardRoot.empty()||!result->editFile.empty()){
+        if(progressWindow){KillTimer(progressWindow,1);DestroyWindow(progressWindow);progressWindow=nullptr;}EnableWindow(window,TRUE);
+        try{
+          if(!result->clipboardRoot.empty()){
+            std::vector<kz::fs::path> files;for(const auto& entry:kz::fs::directory_iterator(result->clipboardRoot))files.push_back(entry.path());
+            kz::win::copyFilesClipboard(window,files);clipboardRoots.push_back(result->clipboardRoot);
+            SetWindowTextW(statusText,kz::widen(result->message).c_str());return 0;
+          }
+          wchar_t system[MAX_PATH];GetSystemDirectoryW(system,MAX_PATH);auto editor=kz::fs::path(system)/L"notepad.exe";
+          auto arguments=kz::quoteWindows(result->editFile.wstring());
+          if(reinterpret_cast<INT_PTR>(ShellExecuteW(window,L"open",editor.c_str(),arguments.c_str(),nullptr,SW_SHOWNORMAL))<=32)throw std::runtime_error("메모장을 시작하지 못했습니다.");
+          if(MessageBoxW(window,L"메모장에서 편집하고 저장한 뒤 파일을 닫으세요.\n\n저장된 변경 내용을 압축 파일에 반영할까요? 아니요를 누르면 원본을 유지합니다.",L"외부 편집 반영",MB_YESNO|MB_ICONQUESTION)==IDYES){
+            auto data=std::make_shared<Result>(std::move(*result));
+            start([data]{
+              try{
+                if(kz::fs::file_size(data->editArchive)!=data->editSize||kz::fs::last_write_time(data->editArchive)!=data->editStamp)throw std::runtime_error("편집 중 압축 파일이 바뀌었습니다. 원본을 다시 열어 주세요.");
+                engine->edit(data->editArchive,"replace",{data->editName,data->editFile.u8string()},data->editPassword);
+                Result done{engine->list(data->editArchive,data->editPassword),true,"외부 편집 내용 반영 및 무결성 검사 완료"};std::error_code ec;kz::fs::remove_all(data->editRoot,ec);return done;
+              }catch(...){std::error_code ec;kz::fs::remove_all(data->editRoot,ec);throw;}
+            },1);return 0;
+          }
+          std::error_code ec;kz::fs::remove_all(result->editRoot,ec);SetWindowTextW(statusText,L"외부 편집 반영을 취소했습니다.");
+        }catch(const std::exception& e){std::error_code ec;if(!result->clipboardRoot.empty())kz::fs::remove_all(result->clipboardRoot,ec);if(!result->editRoot.empty())kz::fs::remove_all(result->editRoot,ec);MessageBoxW(window,kz::widen(e.what()).c_str(),L"어린이zip",MB_OK|MB_ICONERROR);}
+        return 0;
+      }
       if(!result->previewFile.empty()){
         if(progressWindow){KillTimer(progressWindow,1);DestroyWindow(progressWindow);progressWindow=nullptr;}EnableWindow(window,TRUE);
         kz::win::showPreview(window,result->previewFile);std::error_code ec;kz::fs::remove_all(result->previewRoot,ec);SetWindowTextW(statusText,L"미리보기 완료");return 0;
@@ -880,7 +1060,7 @@ LRESULT CALLBACK procedure(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp) {
     }
     case WM_GETMINMAXINFO:{auto info=reinterpret_cast<MINMAXINFO*>(lp);info->ptMinTrackSize={px(730),px(460)};return 0;}
     case WM_CLOSE:if(busy){MessageBoxW(hwnd,L"작업을 취소한 뒤 창을 닫아 주세요.",L"어린이zip",MB_OK);return 0;}DestroyWindow(hwnd);return 0;
-    case WM_DESTROY:if(worker.joinable())worker.join();DeleteObject(font);DeleteObject(footerBrush);PostQuitMessage(0);return 0;
+    case WM_DESTROY:if(worker.joinable())worker.join();if(GetClipboardOwner()==window&&OpenClipboard(window)){EmptyClipboard();CloseClipboard();}for(const auto& root:clipboardRoots){std::error_code ec;kz::fs::remove_all(root,ec);}DeleteObject(font);DeleteObject(footerBrush);PostQuitMessage(0);return 0;
   }
   return DefWindowProcW(hwnd,msg,wp,lp);
 }
@@ -892,7 +1072,7 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int show) {
   cls.hCursor=LoadCursorW(nullptr,IDC_ARROW);cls.hIcon=LoadIconW(instance,MAKEINTRESOURCEW(1));RegisterClassW(&cls);
   HWND main=CreateWindowW(cls.lpszClassName,L"어린이zip",WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,CW_USEDEFAULT,CW_USEDEFAULT,840,620,nullptr,nullptr,instance,nullptr);
   ShowWindow(main,show);UpdateWindow(main);PostMessageW(main,Startup,0,0);
-  ACCEL keys[]={{FVIRTKEY,VK_F2,RenameEntry},{FVIRTKEY,VK_INSERT,AddEntries},{FVIRTKEY,VK_DELETE,DeleteEntries},{FVIRTKEY|FCONTROL,'O',Open},{FVIRTKEY|FCONTROL,'N',CreateFiles},{FVIRTKEY|FCONTROL,'A',SelectAll},{FVIRTKEY|FCONTROL,'F',FindFile},{FVIRTKEY|FCONTROL,'T',Test},{FVIRTKEY|FCONTROL,'E',Extract},{FVIRTKEY|FCONTROL,'W',Exit},{FVIRTKEY|FCONTROL|FSHIFT,'N',NewWindow},{FVIRTKEY,VK_F4,CloseArchive},{FVIRTKEY,VK_F6,Home},{FVIRTKEY,VK_F1,About},{FVIRTKEY,VK_F5,Preferences},{FVIRTKEY,VK_F7,ToggleTree}};
+  ACCEL keys[]={{FVIRTKEY|FCONTROL,'I',ScanArchive},{FVIRTKEY|FCONTROL|FSHIFT,'M',EditComment},{FVIRTKEY,VK_F8,EditComment},{FVIRTKEY|FCONTROL,'C',CopyFiles},{FVIRTKEY|FCONTROL,'V',PasteFiles},{FVIRTKEY,VK_F2,RenameEntry},{FVIRTKEY,VK_INSERT,AddEntries},{FVIRTKEY,VK_DELETE,DeleteEntries},{FVIRTKEY|FCONTROL,'O',Open},{FVIRTKEY|FCONTROL,'N',CreateFiles},{FVIRTKEY|FCONTROL,'A',SelectAll},{FVIRTKEY|FCONTROL,'F',FindFile},{FVIRTKEY|FCONTROL,'T',Test},{FVIRTKEY|FCONTROL,'E',Extract},{FVIRTKEY|FCONTROL,'W',Exit},{FVIRTKEY|FCONTROL|FSHIFT,'N',NewWindow},{FVIRTKEY,VK_F4,CloseArchive},{FVIRTKEY,VK_F6,Home},{FVIRTKEY,VK_F1,About},{FVIRTKEY,VK_F5,Preferences},{FVIRTKEY,VK_F7,ToggleTree}};
   HACCEL accelerators=CreateAcceleratorTableW(keys,static_cast<int>(std::size(keys)));
   MSG msg;while(GetMessageW(&msg,nullptr,0,0)>0){
     // Preserve ordinary editing shortcuts in the password field.
