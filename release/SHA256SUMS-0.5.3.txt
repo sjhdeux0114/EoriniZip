@@ -1,0 +1,2 @@
+﻿fe79b6d47e954f8339ecad74a8828ee5d6bb3acd6aa4b49f0ba11265cc5a7df7 *EoriniZip-0.5.3-windows-x64-setup.exe
+493cf6b3ae8f8d80158133bc77881ba9b2f9eb643300da45ac8e799494824829 *EoriniZip-0.5.3-windows-x64-portable.zip

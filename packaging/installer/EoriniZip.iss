@@ -1,4 +1,4 @@
-#define AppVersion "0.5.2"
+#define AppVersion "0.5.3"
 #define AppName "?´ë¦°?´zip"
 #ifndef PackageDirectory
 #define PackageDirectory "..\..\dist\EoriniZip"
@@ -21,9 +21,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 OutputDir=..\..\dist
 #ifdef TestInstall
-OutputBaseFilename=EoriniZip-0.5.2-installer-test
+OutputBaseFilename=EoriniZip-0.5.3-installer-test
 #else
-OutputBaseFilename=EoriniZip-0.5.2-windows-x64-setup
+OutputBaseFilename=EoriniZip-0.5.3-windows-x64-setup
 #endif
 SetupIconFile=..\..\assets\EoriniZip.ico
 UninstallDisplayIcon={app}\EoriniZip.exe
@@ -33,7 +33,7 @@ WizardStyle=modern
 CloseApplications=no
 RestartApplications=no
 ChangesAssociations=yes
-VersionInfoVersion=0.5.2.0
+VersionInfoVersion=0.5.3.0
 [Languages]
 Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"

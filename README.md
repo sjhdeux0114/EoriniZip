@@ -1,20 +1,20 @@
 <p align="center"><img src="assets/logo.png" width="160" alt="?´ë¦°?´zip ìºë¦­??></p>
 
-# ?´ë¦°?´zip Â· EoriniZip 0.5.2
+# ?´ë¦°?´zip Â· EoriniZip 0.5.3
 
 Windows Win32 / macOS AppKit?€ C++17 ê³µí†µ ì½”ì–´ë¡?ë§Œë“œ??ë¬´ë£Œ ?•ì¶• ?„ë¡œê·¸ë¨?…ë‹ˆ?? 
 
-**0.5.2 ê°œë°œ ë¦´ë¦¬ì¦ˆì…?ˆë‹¤. Windows 11 ì²?ë©”ë‰´?€ macOS ?œê? ?Œì¼ëª?ì²˜ë¦¬ë¥?ë³´ì™„?ˆìŠµ?ˆë‹¤. ë¡œì»¬ ?ŒìŠ¤???¸ì¦?œë¡œ ?œëª…?ˆìœ¼ë©?ê³µì¸ ?œëª…Â·Mac ê³µì¦??ë§ˆì¹œ ?¼ë°˜ ë°°í¬ ë²„ì „?€ ?„ë‹™?ˆë‹¤.**
+**0.5.3 ê°œë°œ ë¦´ë¦¬ì¦ˆì…?ˆë‹¤. Windows 11 ì²?ë©”ë‰´?€ macOS ?œê? ?Œì¼ëª?ì²˜ë¦¬ë¥?ë³´ì™„?ˆìŠµ?ˆë‹¤. ë¡œì»¬ ?ŒìŠ¤???¸ì¦?œë¡œ ?œëª…?ˆìœ¼ë©?ê³µì¸ ?œëª…Â·Mac ê³µì¦??ë§ˆì¹œ ?¼ë°˜ ë°°í¬ ë²„ì „?€ ?„ë‹™?ˆë‹¤.**
 
-## ?¤ìš´ë¡œë“œ Â· 0.5.2 ê°œë°œ ë¦´ë¦¬ì¦?
+## ?¤ìš´ë¡œë“œ Â· 0.5.3 ê°œë°œ ë¦´ë¦¬ì¦?
 
 | ?´ì˜ì²´ì œ | ?¤ì¹˜ ?Œì¼ |
 | --- | --- |
-| Windows x64 | [?¤ì¹˜ ?„ë¡œê·¸ë¨](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.2/EoriniZip-0.5.2-windows-x64-setup.exe) |
-| Mac Apple Silicon (M1 ?´ìƒ) | [arm64 DMG](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.2/EoriniZip-0.5.2-macos-arm64.dmg) |
-| Mac Intel | [x86_64 DMG](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.2/EoriniZip-0.5.2-macos-x86_64.dmg) |
+| Windows x64 | [?¤ì¹˜ ?„ë¡œê·¸ë¨](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.3/EoriniZip-0.5.3-windows-x64-setup.exe) |
+| Mac Apple Silicon (M1 ?´ìƒ) | [arm64 DMG](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.3/EoriniZip-0.5.3-macos-arm64.dmg) |
+| Mac Intel | [x86_64 DMG](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.3/EoriniZip-0.5.3-macos-x86_64.dmg) |
 
-Mac?€ macOS 13 ?´ìƒ??ë°°í¬ ?€?ìœ¼ë¡?ë¹Œë“œ?ˆìŠµ?ˆë‹¤. DMG?ì„œ ?±ì„ Applicationsë¡???²¨ ?¤ì¹˜?©ë‹ˆ?? [?„ì²´ ?Œì¼Â·ZIPÂ·ì²´í¬??·ê?ì¦?ê¸°ë¡](https://github.com/sjhdeux0114/EoriniZip/releases/tag/v0.5.2)???•ì¸?˜ì„¸?? Mac?€ ad-hoc ?œëª…?´ë©° Apple ê³µì¦?€ ?†ìŠµ?ˆë‹¤.
+Mac?€ macOS 13 ?´ìƒ??ë°°í¬ ?€?ìœ¼ë¡?ë¹Œë“œ?ˆìŠµ?ˆë‹¤. DMG?ì„œ ?±ì„ Applicationsë¡???²¨ ?¤ì¹˜?©ë‹ˆ?? [?„ì²´ ?Œì¼Â·ZIPÂ·ì²´í¬??·ê?ì¦?ê¸°ë¡](https://github.com/sjhdeux0114/EoriniZip/releases/tag/v0.5.3)???•ì¸?˜ì„¸?? Mac?€ ad-hoc ?œëª…?´ë©° Apple ê³µì¦?€ ?†ìŠµ?ˆë‹¤.
 
 ## ?•ì¶•ê³??Œì¼ëª?
 
@@ -62,16 +62,16 @@ cmake --build build-cmake --config Release
 ctest --test-dir build-cmake -C Release --output-on-failure
 ```
 
-macOS?ëŠ” Xcode Command Line Tools, Rust?€ ?„ì²´ 7zzê°€ ?„ìš”?©ë‹ˆ?? GitHub Actions??ë¹Œë“œÂ·ì½”ì–´ ê²€?¬ì? ë³„ê°œë¡??€?”í˜• Mac UIÂ·ê³µì¦ ë°?Windows ARM64/PE???¤ê¸°ê¸?ê²€ì¦ì´ ?„ìš”?©ë‹ˆ?? [0.5.2 ê²€ì¦?ê¸°ë¡](docs/release-0.5.2.md)???•ì¸?˜ì„¸??
+macOS?ëŠ” Xcode Command Line Tools, Rust?€ ?„ì²´ 7zzê°€ ?„ìš”?©ë‹ˆ?? GitHub Actions??ë¹Œë“œÂ·ì½”ì–´ ê²€?¬ì? ë³„ê°œë¡??€?”í˜• Mac UIÂ·ê³µì¦ ë°?Windows ARM64/PE???¤ê¸°ê¸?ê²€ì¦ì´ ?„ìš”?©ë‹ˆ?? [0.5.3 ê²€ì¦?ê¸°ë¡](docs/release-0.5.3.md)???•ì¸?˜ì„¸??
 
 ## ?¤ì¹˜ ?Œì¼ê³?Windows 11 ë©”ë‰´
 
 ì²?ë©”ë‰´?ëŠ” DLL/?ˆì??¤íŠ¸ë¦??¸ì— ?¨í‚¤ì§€ IDê°€ ?„ìš”?©ë‹ˆ?? ?¤ì¹˜ ?„ë¡œê·¸ë¨?€ ?ìƒ‰ê¸?ë©”ë‰´ ?µì…˜??? íƒ?˜ë©´ ?œëª…??sparse MSIXë¥??±ë¡?˜ê³  ?œê±° ???±ë¡???´ì œ?©ë‹ˆ?? ?•ì¥ DLL ?´ë¦„?€ ë²„ì „ë³„ë¡œ êµ¬ë¶„?©ë‹ˆ?? ê¸°ë³¸ ???°ê²°?€ ê°•ì œë¡?ë°”ê¾¸ì§€ ?ŠìŠµ?ˆë‹¤.
 
 ```powershell
-./tools/package-windows.ps1 -BuildDirectory build -Destination dist/EoriniZip-0.5.2
-./tools/build-context-menu-package.ps1 -Directory dist/EoriniZip-0.5.2 -CertificateThumbprint <?¸ì¦??ì§€ë¬?
-& '<Inno Setup 6 ê²½ë¡œ>/ISCC.exe' /DPackageDirectory=C:\work\eorinizip\dist\EoriniZip-0.5.2 packaging/installer/EoriniZip.iss
+./tools/package-windows.ps1 -BuildDirectory build -Destination dist/EoriniZip-0.5.3
+./tools/build-context-menu-package.ps1 -Directory dist/EoriniZip-0.5.3 -CertificateThumbprint <?¸ì¦??ì§€ë¬?
+& '<Inno Setup 6 ê²½ë¡œ>/ISCC.exe' /DPackageDirectory=C:\work\eorinizip\dist\EoriniZip-0.5.3 packaging/installer/EoriniZip.iss
 ```
 
 ?¸ì¦??Subject??Publisher??`CN=EoriniZip`ê³??¼ì¹˜?´ì•¼ ?©ë‹ˆ?? ?¼ë°˜ ë°°í¬?ëŠ” ? ë¢°??ì½”ë“œ ?œëª… ?¸ì¦?œê? ?„ìš”?©ë‹ˆ?? ?´ë? ?œëª…???¸ë? MSIX???¨í‚¤ì§•ì˜ `-SignedContextMenuPackage`ë¡??¬í•¨?????ˆìŠµ?ˆë‹¤. **ê°œì¸ ?¤ëŠ” ?¤ì¹˜ ?Œì¼Â·?€?¥ì†Œ???¬í•¨?˜ì? ?ŠìŠµ?ˆë‹¤.**
