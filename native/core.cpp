@@ -123,8 +123,10 @@ std::vector<std::string> createArgs(const Options& o, const fs::path& output, co
   if (o.format == "tar" && (!o.password.empty() || !o.split.empty() || o.hideNames)) throw std::runtime_error("TAR does not support encryption/split options.");
   if (o.hideNames && (o.format != "7z" || o.password.empty())) throw std::runtime_error("Filename encryption requires 7Z and a password.");
   std::vector<std::string> args = {"a", "-t" + o.format, "-mx=" + std::to_string(o.format=="wim"?0:o.level), "-bsp1", "-y", "-sccUTF-8", "-spd"};
-  if(o.format=="zip"||o.format=="7z"){
+  if(o.format=="zip"||o.format=="7z"||o.format=="xz"||o.format=="bzip2"){
     args.push_back(o.multiThread?"-mmt=on":"-mmt=off");
+  }
+  if(o.format=="zip"||o.format=="7z"){
     args.push_back(o.storeTimes?"-mtc=on":"-mtc=off");args.push_back(o.storeTimes?"-mta=on":"-mta=off");
   }
   if(o.format=="zip")args.push_back(o.unicodeNames?"-mcu=on":"-mcu=off");

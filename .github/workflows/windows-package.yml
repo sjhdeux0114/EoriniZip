@@ -1,0 +1,46 @@
+name: Windows installer package
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/windows-package.yml'
+      - 'CMakeLists.txt'
+      - 'native/**'
+      - 'packaging/installer/**'
+      - 'tools/**'
+      - 'third_party/**'
+      - 'tests/**'
+permissions:
+  contents: read
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal && rustup default stable
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Prepare 7-Zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force vendor/7zip | Out-Null
+          Invoke-WebRequest https://github.com/ip7z/7zip/releases/download/26.05/7z2605-x64.exe -OutFile vendor/7zip-setup.exe
+          & 7z x vendor/7zip-setup.exe -ovendor/7zip -y
+          Invoke-WebRequest https://github.com/ip7z/7zip/releases/download/26.05/7z2605-src.tar.xz -OutFile vendor/7zip/7z2605-src.tar.xz
+      - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --config Release
+      - run: ctest --test-dir build -C Release --output-on-failure
+      - name: Package Windows
+        shell: pwsh
+        run: |
+          ./tools/package-windows.ps1 -BuildDirectory build/Release -Destination dist/EoriniZip-0.5.1
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DPackageDirectory="$PWD\dist\EoriniZip-0.5.1" packaging/installer/EoriniZip.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EoriniZip-windows-installer
+          path: |
+            dist/*.exe
+            release/*.exe
+          if-no-files-found: ignore

@@ -218,6 +218,9 @@ int main(int argc,char** argv) {
       auto metadataArgs=kz::createArgs(metadata,root/"test.zip",{input});
       for(const auto& flag:{"-mcu=on","-mtc=on","-mta=on","-mmt=off","-xr!Thumbs.db"})
         check(std::find(metadataArgs.begin(),metadataArgs.end(),flag)!=metadataArgs.end(),"Configured creation option");
+      kz::Options xzOptions;xzOptions.format="xz";xzOptions.multiThread=true;
+      auto xzArgs=kz::createArgs(xzOptions,root/"test.xz",{input});
+      check(std::find(xzArgs.begin(),xzArgs.end(),"-mmt=on")!=xzArgs.end(),"XZ multi-thread flag applied");
 #ifdef _WIN32
       {std::ofstream zone(kz::fs::path(filtered.wstring()+L":Zone.Identifier"));zone<<"[ZoneTransfer]\r\nZoneId=3\r\n";}
       auto zoned=root/"zoned";kz::fs::create_directory(zoned);engine.configureRead(949,true,true);engine.extract(filtered,zoned);

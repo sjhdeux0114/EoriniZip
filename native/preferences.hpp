@@ -9,7 +9,7 @@ namespace kz {
 struct Preferences {
   int escape=1,grid=0,fullRow=1,startHome=1,test=0;
   int unicodeNames=1,storeTimes=1,excludeThumbs=0,parallel=1,zone=1,codePageIndex=0;
-  int showTree=1,showStatus=1,theme=0x15b3f0,level=2;
+  int showTree=1,showStatus=1,theme=0xeb6325,level=2;
   int closeAfterCreate=0,closeAfterExtract=0;
   int fontFamily=0,fontSize=1,columnMask=15,checkUpdates=0,showToolbar=1,language=0;
 };

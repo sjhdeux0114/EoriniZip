@@ -38,9 +38,10 @@ namespace {
 HWND progressWindow=nullptr, tree=nullptr;
 HWND window, list, statusText, pathText, password, passwordLabel, logo, homeOpen, homeCreate;
 HFONT font;
+HFONT titleFont=nullptr, subFont=nullptr;
 HIMAGELIST entryImages=nullptr;
 int folderIcon=-1,fileIcon=-1;
-HBRUSH footerBrush;
+HBRUSH footerBrush=nullptr, bgBrush=nullptr;
 std::vector<HWND> workspace, controls;
 std::unique_ptr<kz::Engine> engine;
 std::thread worker;
@@ -65,7 +66,7 @@ const char* creationFormats[]={"zip","7z","tar","zpaq","gzip","bzip2","xz","7z",
 const char* creationExtensions[]={"zip","7z","tar","zpaq","gz","bz2","xz","exe","wim","iso"};
 const char* formatForIndex(int index){return creationFormats[std::clamp(index,0,9)];}
 const char* extensionForIndex(int index){return creationExtensions[std::clamp(index,0,9)];}
-COLORREF pendingTheme=RGB(240,179,21);
+COLORREF pendingTheme=RGB(37,99,235);
 constexpr const wchar_t* preferencesKey=L"Software\\EoriniZip\\Preferences";
 void loadPreferences() {
   wchar_t temp[32768]{};DWORD tempSize=sizeof(temp);
@@ -97,10 +98,22 @@ struct CreateRequest {
   std::wstring suggested;
 };
 int px(int v) { return MulDiv(v,dpi,96); }
+typedef HRESULT (WINAPI *pfnSetWindowTheme)(HWND, LPCWSTR, LPCWSTR);
+void applyModernTheme(HWND target) {
+  static HMODULE hUxTheme = LoadLibraryW(L"uxtheme.dll");
+  if(hUxTheme){
+    static auto setWindowTheme = reinterpret_cast<pfnSetWindowTheme>(GetProcAddress(hUxTheme, "SetWindowTheme"));
+    if(setWindowTheme) setWindowTheme(target, L"Explorer", nullptr);
+  }
+}
 void applyViewPreferences(){
   const wchar_t* families[]={L"Segoe UI",L"Malgun Gothic",L"Gulim"};const int sizes[]={12,14,16,18,20};
   HFONT next=CreateFontW(-px(sizes[preferences.fontSize]),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,families[preferences.fontFamily]);
   if(next){EnumChildWindows(window,[](HWND child,LPARAM value)->BOOL{SendMessageW(child,WM_SETFONT,static_cast<WPARAM>(value),TRUE);return TRUE;},reinterpret_cast<LPARAM>(next));auto previous=font;font=next;if(previous)DeleteObject(previous);}
+  HFONT nextTitle=CreateFontW(-px(sizes[preferences.fontSize]+2),0,0,0,FW_SEMIBOLD,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,families[preferences.fontFamily]);
+  if(nextTitle){auto prev=titleFont;titleFont=nextTitle;if(prev)DeleteObject(prev);}
+  HFONT nextSub=CreateFontW(-px(std::max(10,sizes[preferences.fontSize]-2)),0,0,0,FW_NORMAL,FALSE,FALSE,FALSE,DEFAULT_CHARSET,OUT_DEFAULT_PRECIS,CLIP_DEFAULT_PRECIS,CLEARTYPE_QUALITY,DEFAULT_PITCH,families[preferences.fontFamily]);
+  if(nextSub){auto prev=subFont;subFont=nextSub;if(prev)DeleteObject(prev);}
   const int widths[]={120,120,170,60};for(int column=1;column<5;++column)ListView_SetColumnWidth(list,column,(preferences.columnMask&(1<<(column-1)))?px(widths[column-1]):0);
 }
 std::wstring text(HWND control) {
@@ -141,12 +154,12 @@ std::vector<kz::fs::path> choose(bool folder,bool multiple=false,bool save=false
 }
 void layout() {
   RECT r;GetClientRect(window,&r);int w=r.right,h=r.bottom;
-  MoveWindow(homeOpen,w/2-px(162),h/2-px(75),px(160),px(130),TRUE);
-  MoveWindow(homeCreate,w/2+px(2),h/2-px(75),px(160),px(130),TRUE);
-  MoveWindow(logo,px(20),px(20),px(60),px(60),TRUE);
-  MoveWindow(statusText,px(15),h-px(28),std::max(px(100),w-px(30)),px(24),TRUE);
+  MoveWindow(homeOpen,w/2-px(175),h/2-px(85),px(170),px(145),TRUE);
+  MoveWindow(homeCreate,w/2+px(5),h/2-px(85),px(170),px(145),TRUE);
+  MoveWindow(logo,w/2-px(30),h/2-px(165),px(60),px(60),TRUE);
+  MoveWindow(statusText,px(15),h-px(27),std::max(px(100),w-px(30)),px(22),TRUE);
   const int ids[]={Open,CreateFiles,CreateFolder,Extract,Test,Cancel,Refresh,Home};
-  for(int i=0;i<8;++i){auto button=GetDlgItem(window,ids[i]+1000);MoveWindow(button,px(10+i*86),px(12),px(80),px(30),TRUE);ShowWindow(button,!home&&preferences.showToolbar?SW_SHOW:SW_HIDE);}
+  for(int i=0;i<8;++i){auto button=GetDlgItem(window,ids[i]+1000);MoveWindow(button,px(10+i*86),px(10),px(80),px(30),TRUE);ShowWindow(button,!home&&preferences.showToolbar?SW_SHOW:SW_HIDE);}
   const int offset=preferences.showToolbar?0:-42;
   MoveWindow(pathText,px(12),px(56+offset),w-px(24),px(24),TRUE);
   MoveWindow(passwordLabel,px(12),px(91+offset),px(70),px(24),TRUE);
@@ -644,7 +657,8 @@ INT_PTR CALLBACK settingsProcedure(HWND dialog,UINT msg,WPARAM wp,LPARAM lp) {
     try{kz::win::registryString(preferencesKey,L"TemporaryFolder",pendingTemporaryFolder.wstring());temporaryFolder=pendingTemporaryFolder;}catch(const std::exception& e){MessageBoxW(dialog,kz::widen(e.what()).c_str(),L"어린이zip",MB_OK|MB_ICONERROR);return TRUE;}
     applyViewPreferences();
     if(preferences.language!=previous.language)MessageBoxW(dialog,L"언어 설정은 다음 실행부터 적용됩니다.",L"어린이zip",MB_OK|MB_ICONINFORMATION);
-    ListView_SetExtendedListViewStyle(list,LVS_EX_DOUBLEBUFFER|(preferences.fullRow?LVS_EX_FULLROWSELECT:0)|(preferences.grid?LVS_EX_GRIDLINES:0));
+    applyModernTheme(list);applyModernTheme(tree);
+      ListView_SetExtendedListViewStyle(list,LVS_EX_DOUBLEBUFFER|(preferences.fullRow?LVS_EX_FULLROWSELECT:0)|(preferences.grid?LVS_EX_GRIDLINES:0));
     treeVisible=preferences.showTree;statusVisible=preferences.showStatus;ShowWindow(statusText,statusVisible?SW_SHOW:SW_HIDE);layout();InvalidateRect(window,nullptr,TRUE);
     EndDialog(dialog,IDOK);return TRUE;
   }
@@ -914,7 +928,7 @@ LRESULT CALLBACK procedure(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp) {
       // Workspace IDs differ for duplicate home buttons; commands route to the same actions.
       const wchar_t* labels[]={L"열기",L"새 압축",L"폴더 압축",L"압축 풀기",L"검사",L"취소",L"다시 읽기",L"기본 화면"};
       const int ids[]={Open,CreateFiles,CreateFolder,Extract,Test,Cancel,Refresh,Home};
-      for(int i=0;i<8;++i){auto b=control(L"BUTTON",labels[i],WS_TABSTOP,ids[i]+1000);workspace.push_back(b);controls.push_back(b);}
+      for(int i=0;i<8;++i){auto b=control(L"BUTTON",labels[i],BS_OWNERDRAW|WS_TABSTOP,ids[i]+1000);workspace.push_back(b);controls.push_back(b);}
       pathText=control(L"STATIC",L"",SS_PATHELLIPSIS);
       passwordLabel=control(L"STATIC",L"비밀번호",0);
       password=control(L"EDIT",L"",WS_BORDER|ES_PASSWORD|ES_AUTOHSCROLL|WS_TABSTOP);
@@ -929,6 +943,7 @@ LRESULT CALLBACK procedure(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp) {
         }
         ListView_SetImageList(list,entryImages,LVSIL_SMALL);TreeView_SetImageList(tree,entryImages,TVSIL_NORMAL);
       }
+      applyModernTheme(list);applyModernTheme(tree);
       ListView_SetExtendedListViewStyle(list,LVS_EX_DOUBLEBUFFER|(preferences.fullRow?LVS_EX_FULLROWSELECT:0)|(preferences.grid?LVS_EX_GRIDLINES:0));
       const wchar_t* columns[]={L"이름",L"원본 크기 (B)",L"압축 크기 (B)",L"수정 날짜",L"암호"};int widths[]={280,120,120,170,60};
       for(int i=0;i<5;++i){auto label=kz::ui::label(columns[i]);LVCOLUMNW c{};c.mask=LVCF_TEXT|LVCF_WIDTH;c.pszText=label.data();c.cx=px(widths[i]);ListView_InsertColumn(list,i,&c);}
@@ -1073,7 +1088,7 @@ LRESULT CALLBACK procedure(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp) {
     }
     case WM_GETMINMAXINFO:{auto info=reinterpret_cast<MINMAXINFO*>(lp);info->ptMinTrackSize={px(730),px(460)};return 0;}
     case WM_CLOSE:if(busy){MessageBoxW(hwnd,L"작업을 취소한 뒤 창을 닫아 주세요.",L"어린이zip",MB_OK);return 0;}DestroyWindow(hwnd);return 0;
-    case WM_DESTROY:if(worker.joinable())worker.join();if(GetClipboardOwner()==window&&OpenClipboard(window)){EmptyClipboard();CloseClipboard();}for(const auto& root:clipboardRoots){std::error_code ec;kz::fs::remove_all(root,ec);}if(entryImages){ListView_SetImageList(list,nullptr,LVSIL_SMALL);TreeView_SetImageList(tree,nullptr,TVSIL_NORMAL);ImageList_Destroy(entryImages);entryImages=nullptr;}DeleteObject(font);DeleteObject(footerBrush);PostQuitMessage(0);return 0;
+    case WM_DESTROY:if(worker.joinable())worker.join();if(GetClipboardOwner()==window&&OpenClipboard(window)){EmptyClipboard();CloseClipboard();}for(const auto& root:clipboardRoots){std::error_code ec;kz::fs::remove_all(root,ec);}if(entryImages){ListView_SetImageList(list,nullptr,LVSIL_SMALL);TreeView_SetImageList(tree,nullptr,TVSIL_NORMAL);ImageList_Destroy(entryImages);entryImages=nullptr;}DeleteObject(font);DeleteObject(footerBrush);if(bgBrush)DeleteObject(bgBrush);if(titleFont)DeleteObject(titleFont);if(subFont)DeleteObject(subFont);PostQuitMessage(0);return 0;
   }
   return DefWindowProcW(hwnd,msg,wp,lp);
 }
