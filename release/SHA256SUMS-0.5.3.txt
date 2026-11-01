@@ -1,2 +1,2 @@
-﻿fe79b6d47e954f8339ecad74a8828ee5d6bb3acd6aa4b49f0ba11265cc5a7df7 *EoriniZip-0.5.3-windows-x64-setup.exe
-493cf6b3ae8f8d80158133bc77881ba9b2f9eb643300da45ac8e799494824829 *EoriniZip-0.5.3-windows-x64-portable.zip
+2204ef78acc7d7be3ff02c9040bd6b2f49bb694f03fa154a87c3feee9f68137f  EoriniZip-0.5.3-windows-x64-setup.exe
+e46a3bba30f7ccb76aa15e6f74dbaa50a5b3069c79584861532aced3e7af91cd  EoriniZip-0.5.3-windows-x64-portable.zip
