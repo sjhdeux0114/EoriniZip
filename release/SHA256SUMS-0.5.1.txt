@@ -1,8 +1,0 @@
-fe79b6d47e954f8339ecad74a8828ee5d6bb3acd6aa4b49f0ba11265cc5a7df7  EoriniZip-0.5.1-windows-x64-setup.exe
-493cf6b3ae8f8d80158133bc77881ba9b2f9eb643300da45ac8e799494824829  EoriniZip-0.5.1-windows-x64-portable.zip
-437d45e3ebd1ec4d79144bccd818ee3450b4b5d657a26d06f3d78bbe6169805d  EoriniZip-0.5.1-windows-x64-context-menu.msix
-2c80b84c30dd09bd489b70f65fbbd0b9247f24cfef0c3c03dc2b54aed0a5971e  EoriniZip-test-signing.cer
-7a63c15a63ebd95c9934be929c4edc1e90c6c4111934e60c4be9abecbf1fec1e  EoriniZip-0.5.1-macos-arm64.dmg
-5d2ca7aa8f5332fb229ded5e9ea9ef7b288201a7246064bb0391586b520210a9  EoriniZip-0.5.1-macos-arm64.zip
-9020e99236f81b502ff3b539c9ed9fbb138531180c83048f65617e3fcd615dfd  EoriniZip-0.5.1-macos-x86_64.dmg
-61495a5609b147a7dc22fdcc4712bd1976e40217b3d9dba9235d285c1d231dae  EoriniZip-0.5.1-macos-x86_64.zip
