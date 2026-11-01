@@ -194,6 +194,12 @@ void suggestOutput(HWND dialog,CreateRequest& request) {
   SetDlgItemTextW(dialog,IDC_OUTPUT,request.suggested.c_str());
 }
 INT_PTR CALLBACK createProcedure(HWND dialog,UINT msg,WPARAM wp,LPARAM lp) {
+  if(msg==WM_CTLCOLORDLG) return reinterpret_cast<INT_PTR>(GetStockObject(WHITE_BRUSH));
+  if(msg==WM_CTLCOLORSTATIC){
+    SetBkMode(reinterpret_cast<HDC>(wp),TRANSPARENT);
+    SetTextColor(reinterpret_cast<HDC>(wp),RGB(30,41,59));
+    return reinterpret_cast<INT_PTR>(GetStockObject(WHITE_BRUSH));
+  }
   auto request=reinterpret_cast<CreateRequest*>(GetWindowLongPtrW(dialog,DWLP_USER));
   if(msg==WM_INITDIALOG) {kz::ui::dialog(dialog);
     request=reinterpret_cast<CreateRequest*>(lp);SetWindowLongPtrW(dialog,DWLP_USER,lp);
@@ -340,6 +346,12 @@ std::wstring durationText(long long seconds) {
   return std::to_wstring(seconds/60)+L"�?"+std::to_wstring(seconds%60)+L"�?;
 }
 INT_PTR CALLBACK progressProcedure(HWND dialog,UINT msg,WPARAM wp,LPARAM) {
+  if(msg==WM_CTLCOLORDLG) return reinterpret_cast<INT_PTR>(GetStockObject(WHITE_BRUSH));
+  if(msg==WM_CTLCOLORSTATIC){
+    SetBkMode(reinterpret_cast<HDC>(wp),TRANSPARENT);
+    SetTextColor(reinterpret_cast<HDC>(wp),RGB(30,41,59));
+    return reinterpret_cast<INT_PTR>(GetStockObject(WHITE_BRUSH));
+  }
   if(msg==WM_INITDIALOG){kz::ui::dialog(dialog);
     lastProgress=-2;progressMarquee=false;
     SendDlgItemMessageW(dialog,IDC_PROGRESS_BAR,PBM_SETRANGE32,0,100);
