@@ -62,8 +62,8 @@ begin
   PackagePath := ExpandConstant('{app}\Package\EoriniZip.ContextMenu.msix');
   if not FileExists(PackagePath) then begin
     Log('Windows 11 modern menu unavailable: signed identity MSIX is missing.');
-    if not WizardSilent then
-      MsgBox('Windows 11 ì²??°í´ë¦?ë©”ë‰´???œëª… ?¨í‚¤ì§€ê°€ ?¬í•¨?˜ì? ?Šì•˜?µë‹ˆ?? ?´ë¦°?´zip ë©”ë‰´??[??ë§ì? ?µì…˜ ?œì‹œ]?ì„œ ?¬ìš©?????ˆìŠµ?ˆë‹¤.', mbInformation, MB_OK);
+    // if not WizardSilent then
+    //   MsgBox('Windows 11 ì²??°í´ë¦?ë©”ë‰´???œëª… ?¨í‚¤ì§€ê°€ ?¬í•¨?˜ì? ?Šì•˜?µë‹ˆ?? ?´ë¦°?´zip ë©”ë‰´??[??ë§ì? ?µì…˜ ?œì‹œ]?ì„œ ?¬ìš©?????ˆìŠµ?ˆë‹¤.', mbInformation, MB_OK);
     Exit;
   end;
   Parameters := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + Script +
@@ -73,8 +73,8 @@ begin
     ResultCode := -1;
   if ResultCode <> 0 then begin
     Log('Windows 11 context menu registration failed: ' + IntToStr(ResultCode));
-    if not WizardSilent then
-      MsgBox('Windows 11 ë©”ë‰´ ?±ë¡???¤íŒ¨?ˆìŠµ?ˆë‹¤. [??ë§ì? ?µì…˜ ?œì‹œ]??ë©”ë‰´ë¥??¬ìš©?˜ê±°???¤ì¹˜ ?´ë”??windows11-menu.ps1ë¡??±ë¡ ?¤ë¥˜ë¥??•ì¸?˜ì„¸??', mbInformation, MB_OK);
+    // if not WizardSilent then
+    //   MsgBox('Windows 11 ë©”ë‰´ ?±ë¡???¤íŒ¨?ˆìŠµ?ˆë‹¤. [??ë§ì? ?µì…˜ ?œì‹œ]??ë©”ë‰´ë¥??¬ìš©?˜ê±°???¤ì¹˜ ?´ë”??windows11-menu.ps1ë¡??±ë¡ ?¤ë¥˜ë¥??•ì¸?˜ì„¸??', mbInformation, MB_OK);
   end;
 end;
 [Registry]
