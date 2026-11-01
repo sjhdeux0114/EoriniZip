@@ -15,16 +15,21 @@
 - 현대 메뉴 패키지 Status Ok, EoriniZipModernShell_v051.dll 등록. 클래식 메뉴도 LocalAppData/Programs/EoriniZip의 버전 DLL 참조.
 - 상세 변경과 기능 제한은 docs/release-0.5.1.md에 기록했습니다.
 
-## 배포 진행 순서
+## 배포 완료
 
-1. 커밋·푸시 후 Windows/macOS GitHub Actions 확인. 실패 시 수정 후 재실행.
-2. 휴대용 ZIP·MSIX·공개 CER·체크섬과 setup을 v0.5.1 prerelease에 게시.
-3. 원격 CI 및 릴리즈 결과를 이 문서에 갱신.
+- 구현 커밋·푸시 완료. 릴리즈 태그 v0.5.1은 검증한 소스 9e104e6을 참조합니다.
+- [Windows/macOS 빌드·테스트](https://github.com/sjhdeux0114/EoriniZip/actions/runs/41254697397), [보안 검사](https://github.com/sjhdeux0114/EoriniZip/actions/runs/41254697385) 통과.
+- [macOS 15 arm64/x86_64 패키징](https://github.com/sjhdeux0114/EoriniZip/actions/runs/41254697409) 통과. 번들 엔진으로 통합 검사, 아키텍처·라이브러리·서명 검사와 DMG 무결성 확인.
+- Windows의 [폴더] 접두어를 제거하고 기본 폴더 아이콘으로 표시. 왼쪽 트리와 Mac 파일 목록에도 적용.
+- 아이콘 수정 후 Windows 설치 프로그램·휴대용 ZIP 재생성, 서명 Valid. 최종 설치 성공 및 설치된 파일 해시 일치.
+- Mac arm64/Intel DMG·ZIP 및 체크섬을 dist에 저장. 다운로드한 파일 해시가 CI 체크섬과 일치.
+- [v0.5.1 개발 릴리즈](https://github.com/sjhdeux0114/EoriniZip/releases/tag/v0.5.1) 공개 게시 완료. Windows/Mac 파일과 공개 CER·MSIX·체크섬 업로드. 업로드 자산의 SHA-256을 로컬 dist와 대조했습니다.
+- Windows·Mac 설치 파일의 직접 링크는 README.md에 정리했습니다.
 
 ## 후속 검증 및 제한
 
 - 설정의 모든 저장/재시작 조합, 클립보드 실제 복사/붙여넣기, 외부 편집 전체 UI 흐름.
-- Mac 실제 UI, ARM64/Windows PE 실기기, 일반 배포용 공인 인증서와 Mac 공증.
+- Mac 실제 대화형 UI, Windows ARM64/PE 실기기, 일반 배포용 공인 인증서와 Mac 공증.
 - 영어 상세 메시지 완전 번역, 폴더 붙여넣기와 대형/바이너리 외부 편집.
 - ZIP 복구는 비암호화 store/deflate의 완전한 로컬 레코드만 지원. 암호 복구는 제공 후보 목록만 시도.
 - ISO는 비부팅 데이터 이미지, WIM은 비압축. 업데이트 새 안정 버전 다운로드·설치 전체는 별도 검증 필요.

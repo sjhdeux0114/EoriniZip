@@ -6,6 +6,16 @@ Windows Win32 / macOS AppKit와 C++17 공통 코어로 만드는 무료 압축 �
 
 **0.5.1 개발 릴리즈입니다. Windows 11 첫 메뉴와 macOS 한글 파일명 처리를 보완했습니다. 로컬 테스트 인증서로 서명했으며 공인 서명·Mac 공증을 마친 일반 배포 버전은 아닙니다.**
 
+## 다운로드 · 0.5.1 개발 릴리즈
+
+| 운영체제 | 설치 파일 |
+| --- | --- |
+| Windows x64 | [설치 프로그램](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.1/EoriniZip-0.5.1-windows-x64-setup.exe) |
+| Mac Apple Silicon (M1 이상) | [arm64 DMG](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.1/EoriniZip-0.5.1-macos-arm64.dmg) |
+| Mac Intel | [x86_64 DMG](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.1/EoriniZip-0.5.1-macos-x86_64.dmg) |
+
+Mac은 macOS 13 이상을 배포 대상으로 빌드했습니다. DMG에서 앱을 Applications로 옮겨 설치합니다. [전체 파일·ZIP·체크섬·검증 기록](https://github.com/sjhdeux0114/EoriniZip/releases/tag/v0.5.1)을 확인하세요. Mac은 ad-hoc 서명이며 Apple 공증은 없습니다.
+
 ## 압축과 파일명
 
 - ZIP / 7Z / TAR / ZPAQ 생성·목록·해제·검사. ZIP AES-256, 7Z 파일명 암호화, ZIP/7Z 분할 생성.
@@ -52,7 +62,7 @@ cmake --build build-cmake --config Release
 ctest --test-dir build-cmake -C Release --output-on-failure
 ```
 
-macOS에는 Xcode Command Line Tools, Rust와 전체 7zz가 필요합니다. GitHub Actions의 빌드·코어 검사와 별개로 대화형 Mac UI·공증 및 ARM64/Windows PE는 실기기 검증이 필요합니다. [0.5.1 검증 기록](docs/release-0.5.1.md)을 확인하세요.
+macOS에는 Xcode Command Line Tools, Rust와 전체 7zz가 필요합니다. GitHub Actions의 빌드·코어 검사와 별개로 대화형 Mac UI·공증 및 Windows ARM64/PE는 실기기 검증이 필요합니다. [0.5.1 검증 기록](docs/release-0.5.1.md)을 확인하세요.
 
 ## 설치 파일과 Windows 11 메뉴
 
