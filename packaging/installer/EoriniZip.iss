@@ -1,5 +1,5 @@
-#define AppVersion "0.5.3"
-#define AppName "?�린?�zip"
+﻿#define AppVersion "0.5.3"
+#define AppName "어린이zip"
 #ifndef PackageDirectory
 #define PackageDirectory "..\..\dist\EoriniZip"
 #endif
@@ -38,8 +38,8 @@ VersionInfoVersion=0.5.3.0
 Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 [Tasks]
-Name: "explorer"; Description: "?�색�??�클�?메뉴 ?�록"
-Name: "desktopicon"; Description: "바탕 ?�면 바로 가�?만들�?; Flags: unchecked
+Name: "explorer"; Description: "탐색기 우클릭 메뉴 등록"
+Name: "desktopicon"; Description: "바탕 화면 바로 가기 만들기"; Flags: unchecked
 [Files]
 Source: "{#PackageDirectory}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 [Icons]
@@ -63,7 +63,7 @@ begin
   if not FileExists(PackagePath) then begin
     Log('Windows 11 modern menu unavailable: signed identity MSIX is missing.');
     // if not WizardSilent then
-    //   MsgBox('Windows 11 �??�클�?메뉴???�명 ?�키지가 ?�함?��? ?�았?�니?? ?�린?�zip 메뉴??[??많�? ?�션 ?�시]?�서 ?�용?????�습?�다.', mbInformation, MB_OK);
+    // MsgBox('Windows 11 첫 우클릭 메뉴용 서명 패키지가 포함되지 않았습니다. 어린이zip 메뉴는 [더 많은 옵션 표시]에서 사용할 수 있습니다.', mbInformation, MB_OK);
     Exit;
   end;
   Parameters := '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + Script +
@@ -74,7 +74,7 @@ begin
   if ResultCode <> 0 then begin
     Log('Windows 11 context menu registration failed: ' + IntToStr(ResultCode));
     // if not WizardSilent then
-    //   MsgBox('Windows 11 메뉴 ?�록???�패?�습?�다. [??많�? ?�션 ?�시]??메뉴�??�용?�거???�치 ?�더??windows11-menu.ps1�??�록 ?�류�??�인?�세??', mbInformation, MB_OK);
+      // MsgBox('Windows 11 메뉴 등록에 실패했습니다. [더 많은 옵션 표시]의 메뉴를 사용하거나 설치 폴더의 windows11-menu.ps1로 등록 오류를 확인하세요.', mbInformation, MB_OK);
   end;
 end;
 [Registry]
@@ -82,138 +82,138 @@ Root: HKCU; Subkey: "Software\Classes\CLSID\{{5B30EB48-528D-446B-B18E-BB516C5B90
 Root: HKCU; Subkey: "Software\Classes\CLSID\{{5B30EB48-528D-446B-B18E-BB516C5B902F}\InprocServer32"; ValueType: string; ValueName: "ThreadingModel"; ValueData: "Apartment"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\*\shellex\ContextMenuHandlers\EoriniZip"; ValueType: string; ValueName: ""; ValueData: "{{5B30EB48-528D-446B-B18E-BB516C5B902F}"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\Directory\shellex\ContextMenuHandlers\EoriniZip"; ValueType: string; ValueName: ""; ValueData: "{{5B30EB48-528D-446B-B18E-BB516C5B902F}"; Flags: uninsdeletekey; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zip\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ?�축 ?��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zip\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 압축 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zip\shell\EoriniZip.Open"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zip\shell\EoriniZip.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-here ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zip\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ???�더???��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zip\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 새 폴더에 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zip\shell\EoriniZip.Extract"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zip\shell\EoriniZip.Extract\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-folder ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zip\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "?�아???��?(?�린?�zip)"; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zip\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "알아서 풀기 (어린이zip)"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zip\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zip\shell\EoriniZip.ExtractSmart\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-smart ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.7z\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ?�축 ?��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.7z\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 압축 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.7z\shell\EoriniZip.Open"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.7z\shell\EoriniZip.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-here ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.7z\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ???�더???��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.7z\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 새 폴더에 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.7z\shell\EoriniZip.Extract"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.7z\shell\EoriniZip.Extract\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-folder ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.7z\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "?�아???��?(?�린?�zip)"; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.7z\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "알아서 풀기 (어린이zip)"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.7z\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.7z\shell\EoriniZip.ExtractSmart\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-smart ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.rar\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ?�축 ?��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.rar\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 압축 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.rar\shell\EoriniZip.Open"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.rar\shell\EoriniZip.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-here ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.rar\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ???�더???��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.rar\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 새 폴더에 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.rar\shell\EoriniZip.Extract"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.rar\shell\EoriniZip.Extract\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-folder ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.rar\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "?�아???��?(?�린?�zip)"; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.rar\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "알아서 풀기 (어린이zip)"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.rar\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.rar\shell\EoriniZip.ExtractSmart\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-smart ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.tar\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ?�축 ?��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.tar\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 압축 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.tar\shell\EoriniZip.Open"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.tar\shell\EoriniZip.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-here ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.tar\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ???�더???��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.tar\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 새 폴더에 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.tar\shell\EoriniZip.Extract"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.tar\shell\EoriniZip.Extract\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-folder ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.tar\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "?�아???��?(?�린?�zip)"; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.tar\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "알아서 풀기 (어린이zip)"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.tar\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.tar\shell\EoriniZip.ExtractSmart\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-smart ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.gz\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ?�축 ?��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.gz\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 압축 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.gz\shell\EoriniZip.Open"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.gz\shell\EoriniZip.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-here ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.gz\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ???�더???��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.gz\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 새 폴더에 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.gz\shell\EoriniZip.Extract"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.gz\shell\EoriniZip.Extract\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-folder ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.gz\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "?�아???��?(?�린?�zip)"; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.gz\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "알아서 풀기 (어린이zip)"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.gz\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.gz\shell\EoriniZip.ExtractSmart\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-smart ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.bz2\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ?�축 ?��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.bz2\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 압축 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.bz2\shell\EoriniZip.Open"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.bz2\shell\EoriniZip.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-here ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.bz2\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ???�더???��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.bz2\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 새 폴더에 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.bz2\shell\EoriniZip.Extract"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.bz2\shell\EoriniZip.Extract\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-folder ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.bz2\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "?�아???��?(?�린?�zip)"; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.bz2\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "알아서 풀기 (어린이zip)"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.bz2\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.bz2\shell\EoriniZip.ExtractSmart\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-smart ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.xz\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ?�축 ?��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.xz\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 압축 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.xz\shell\EoriniZip.Open"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.xz\shell\EoriniZip.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-here ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.xz\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ???�더???��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.xz\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 새 폴더에 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.xz\shell\EoriniZip.Extract"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.xz\shell\EoriniZip.Extract\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-folder ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.xz\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "?�아???��?(?�린?�zip)"; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.xz\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "알아서 풀기 (어린이zip)"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.xz\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.xz\shell\EoriniZip.ExtractSmart\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-smart ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.cab\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ?�축 ?��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.cab\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 압축 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.cab\shell\EoriniZip.Open"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.cab\shell\EoriniZip.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-here ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.cab\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ???�더???��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.cab\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 새 폴더에 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.cab\shell\EoriniZip.Extract"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.cab\shell\EoriniZip.Extract\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-folder ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.cab\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "?�아???��?(?�린?�zip)"; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.cab\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "알아서 풀기 (어린이zip)"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.cab\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.cab\shell\EoriniZip.ExtractSmart\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-smart ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.iso\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ?�축 ?��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.iso\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 압축 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.iso\shell\EoriniZip.Open"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.iso\shell\EoriniZip.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-here ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.iso\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ???�더???��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.iso\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 새 폴더에 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.iso\shell\EoriniZip.Extract"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.iso\shell\EoriniZip.Extract\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-folder ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.iso\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "?�아???��?(?�린?�zip)"; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.iso\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "알아서 풀기 (어린이zip)"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.iso\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.iso\shell\EoriniZip.ExtractSmart\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-smart ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.wim\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ?�축 ?��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.wim\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 압축 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.wim\shell\EoriniZip.Open"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.wim\shell\EoriniZip.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-here ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.wim\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ???�더???��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.wim\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 새 폴더에 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.wim\shell\EoriniZip.Extract"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.wim\shell\EoriniZip.Extract\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-folder ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.wim\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "?�아???��?(?�린?�zip)"; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.wim\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "알아서 풀기 (어린이zip)"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.wim\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.wim\shell\EoriniZip.ExtractSmart\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-smart ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.001\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ?�축 ?��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.001\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 압축 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.001\shell\EoriniZip.Open"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.001\shell\EoriniZip.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-here ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.001\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ???�더???��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.001\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 새 폴더에 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.001\shell\EoriniZip.Extract"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.001\shell\EoriniZip.Extract\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-folder ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.001\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "?�아???��?(?�린?�zip)"; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.001\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "알아서 풀기 (어린이zip)"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.001\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.001\shell\EoriniZip.ExtractSmart\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-smart ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.alz\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ?�축 ?��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.alz\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 압축 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.alz\shell\EoriniZip.Open"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.alz\shell\EoriniZip.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-here ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.alz\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ???�더???��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.alz\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 새 폴더에 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.alz\shell\EoriniZip.Extract"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.alz\shell\EoriniZip.Extract\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-folder ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.alz\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "?�아???��?(?�린?�zip)"; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.alz\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "알아서 풀기 (어린이zip)"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.alz\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.alz\shell\EoriniZip.ExtractSmart\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-smart ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.egg\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ?�축 ?��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.egg\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 압축 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.egg\shell\EoriniZip.Open"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.egg\shell\EoriniZip.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-here ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.egg\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ???�더???��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.egg\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 새 폴더에 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.egg\shell\EoriniZip.Extract"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.egg\shell\EoriniZip.Extract\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-folder ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.egg\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "?�아???��?(?�린?�zip)"; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.egg\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "알아서 풀기 (어린이zip)"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.egg\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.egg\shell\EoriniZip.ExtractSmart\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-smart ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zpaq\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ?�축 ?��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zpaq\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 압축 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zpaq\shell\EoriniZip.Open"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zpaq\shell\EoriniZip.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-here ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zpaq\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ???�더???��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zpaq\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 새 폴더에 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zpaq\shell\EoriniZip.Extract"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zpaq\shell\EoriniZip.Extract\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-folder ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zpaq\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "?�아???��?(?�린?�zip)"; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zpaq\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "알아서 풀기 (어린이zip)"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zpaq\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.zpaq\shell\EoriniZip.ExtractSmart\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-smart ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.ezc\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ?�축 ?��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.ezc\shell\EoriniZip.Open"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 압축 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.ezc\shell\EoriniZip.Open"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.ezc\shell\EoriniZip.Open\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-here ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.ezc\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "?�린?�zip?�로 ???�더???��?; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.ezc\shell\EoriniZip.Extract"; ValueType: string; ValueName: ""; ValueData: "어린이zip으로 새 폴더에 풀기"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.ezc\shell\EoriniZip.Extract"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.ezc\shell\EoriniZip.Extract\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-folder ""%1"""; Tasks: explorer
-Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.ezc\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "?�아???��?(?�린?�zip)"; Flags: uninsdeletekey; Tasks: explorer
+Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.ezc\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: ""; ValueData: "알아서 풀기 (어린이zip)"; Flags: uninsdeletekey; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.ezc\shell\EoriniZip.ExtractSmart"; ValueType: string; ValueName: "Icon"; ValueData: """{app}\EoriniZip.exe"",0"; Tasks: explorer
 Root: HKCU; Subkey: "Software\Classes\SystemFileAssociations\.ezc\shell\EoriniZip.ExtractSmart\command"; ValueType: string; ValueName: ""; ValueData: """{app}\EoriniZip.exe"" --extract-smart ""%1"""; Tasks: explorer
