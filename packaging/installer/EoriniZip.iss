@@ -1,4 +1,4 @@
-﻿#define AppVersion "0.5.4"
+﻿#define AppVersion "0.5.5"
 #define AppName "어린이zip"
 #ifndef PackageDirectory
 #define PackageDirectory "..\..\dist\EoriniZip"
@@ -30,8 +30,8 @@ UninstallDisplayIcon={app}\EoriniZip.exe
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
-CloseApplications=no
-RestartApplications=no
+CloseApplications=yes
+RestartApplications=yes
 ChangesAssociations=yes
 VersionInfoVersion={#AppVersion}.0
 [Languages]
@@ -41,13 +41,30 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "explorer"; Description: "탐색기 우클릭 메뉴 등록"
 Name: "desktopicon"; Description: "바탕 화면 바로 가기 만들기"; Flags: unchecked
 [Files]
-Source: "{#PackageDirectory}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PackageDirectory}\*"; Excludes: "EoriniZipShell_v051.dll,EoriniZipModernShell_v051.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#PackageDirectory}\EoriniZipShell_v051.dll"; DestDir: "{app}"; Flags: ignoreversion; Check: NeedsShellUpdate('EoriniZipShell_v051.dll', '{#GetSHA256OfFile(PackageDirectory + "\EoriniZipShell_v051.dll")}')
+Source: "{#PackageDirectory}\EoriniZipModernShell_v051.dll"; DestDir: "{app}"; Flags: ignoreversion; Check: NeedsShellUpdate('EoriniZipModernShell_v051.dll', '{#GetSHA256OfFile(PackageDirectory + "\EoriniZipModernShell_v051.dll")}')
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\EoriniZip.exe"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\EoriniZip.exe"; Tasks: desktopicon
 [UninstallRun]
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\windows11-menu.ps1"" -Action Uninstall"; Flags: runhidden waituntilterminated; RunOnceId: "RemoveModernContextMenu"; Check: FileExists(ExpandConstant('{app}\windows11-menu.ps1'))
 [Code]
+function NeedsShellUpdate(const Name, PackageHash: String): Boolean;
+var
+  Path: String;
+begin
+  Path := ExpandConstant('{app}\') + Name;
+  Result := True;
+  if FileExists(Path) then
+    try
+      Result := CompareText(GetSHA256OfFile(Path), PackageHash) <> 0;
+      if not Result then Log('Keeping identical shell extension: ' + Path);
+    except
+      Log('Could not read installed shell extension: ' + Path);
+    end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ResultCode: Integer;

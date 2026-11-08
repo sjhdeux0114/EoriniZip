@@ -736,7 +736,7 @@ void launchUpdateCheck(bool quiet){
   auto script=kz::fs::path(kz::win::executablePath()).parent_path()/L"check-updates.ps1";
   if(!kz::fs::is_regular_file(script))throw std::runtime_error("업데이트 확인 스크립트가 설치 폴더에 없습니다.");
   wchar_t system[MAX_PATH];GetSystemDirectoryW(system,MAX_PATH);auto powershell=kz::fs::path(system)/L"WindowsPowerShell/v1.0/powershell.exe";
-  auto line=kz::quoteWindows(powershell.wstring())+L" -NoProfile -ExecutionPolicy Bypass -File "+kz::quoteWindows(script.wstring())+L" -CurrentVersion 0.5.4"+(quiet?L" -Quiet":L"");
+  auto line=kz::quoteWindows(powershell.wstring())+L" -NoProfile -ExecutionPolicy Bypass -File "+kz::quoteWindows(script.wstring())+L" -CurrentVersion 0.5.5"+(quiet?L" -Quiet":L"");
   STARTUPINFOW startup{sizeof(startup)};PROCESS_INFORMATION process{};
   if(!CreateProcessW(powershell.c_str(),line.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,nullptr,nullptr,&startup,&process))throw std::runtime_error("업데이트 확인을 시작할 수 없습니다.");
   CloseHandle(process.hProcess);CloseHandle(process.hThread);
@@ -754,7 +754,7 @@ bool easyCryptFile(const kz::fs::path& file){auto ext=file.extension().wstring()
     if(id==ViewSettings){DialogBoxParamW(GetModuleHandleW(nullptr),MAKEINTRESOURCEW(IDD_SETTINGS),window,settingsProcedure,5);return;}
     if(id==Preferences||id==ColorSettings){DialogBoxParamW(GetModuleHandleW(nullptr),MAKEINTRESOURCEW(IDD_SETTINGS),window,settingsProcedure,id==ColorSettings?5:0);return;}
     if(id==Exit){SendMessageW(window,WM_CLOSE,0,0);return;}
-    if(id==About){MessageBoxW(window,L"어린이zip 0.5.4 · 네이티브 개발 버전\n\nZIP / 7Z / TAR 압축 및 해제\nALZ / EGG / RAR 해제, ZPAQ 압축·해제\nEasyCrypt 2.4 복호화\n\n분할 메뉴의 서비스 이름은 용량 프리셋이며 현재 서비스의 업로드 한도를 보장하지 않습니다.",L"어린이zip 정보",MB_OK);return;}
+    if(id==About){MessageBoxW(window,L"어린이zip 0.5.5 · 네이티브 개발 버전\n\nZIP / 7Z / TAR 압축 및 해제\nALZ / EGG / RAR 해제, ZPAQ 압축·해제\nEasyCrypt 2.4 복호화\n\n분할 메뉴의 서비스 이름은 용량 프리셋이며 현재 서비스의 업로드 한도를 보장하지 않습니다.",L"어린이zip 정보",MB_OK);return;}
     if(id==Home){showHome(!home);return;}
     if(id==CloseArchive){archive.clear();archiveEntries.clear();visibleEntries.clear();TreeView_DeleteAllItems(tree);ListView_DeleteAllItems(list);SetWindowTextW(pathText,L"");SetWindowTextW(password,L"");showHome(true);return;}
     if(id==Topmost){onTop=!onTop;SetWindowPos(window,onTop?HWND_TOPMOST:HWND_NOTOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE);return;}

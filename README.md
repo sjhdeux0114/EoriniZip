@@ -10,7 +10,7 @@ Windows Win32 / macOS AppKit?€ C++17 ê³µí†µ ì½”ì–´ë¡?ë§Œë“œ??ë¬´ë£Œ ?•ì¶• ?„ë¡œê
 
 | ?´ì˜ì²´ì œ | ?¤ì¹˜ ?Œì¼ |
 | --- | --- |
-| Windows x64 | [?¤ì¹˜ ?„ë¡œê·¸ë¨](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.4/EoriniZip-0.5.4-windows-x64-setup.exe) |
+| Windows x64 | [?¤ì¹˜ ?„ë¡œê·¸ë¨](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.5/EoriniZip-0.5.5-windows-x64-setup.exe) |
 | Mac Apple Silicon (M1 ?´ìƒ) | [arm64 DMG](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.3/EoriniZip-0.5.3-macos-arm64.dmg) |
 | Mac Intel | [x86_64 DMG](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.3/EoriniZip-0.5.3-macos-x86_64.dmg) |
 
