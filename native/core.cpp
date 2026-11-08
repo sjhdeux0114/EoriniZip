@@ -9,6 +9,7 @@
 #include <random>
 #include <regex>
 #include <fstream>
+#include <limits>
 #include <codecvt>
 #ifdef _WIN32
 #include <windows.h>
@@ -165,7 +166,7 @@ std::vector<Entry> parseListing(const std::string& text) {
   }
   flush(); return entries;
 }
-void validateEntries(const std::vector<Entry>& entries) {
+uint64_t validateEntries(const std::vector<Entry>& entries) {
   if (entries.size() > 100000) throw std::runtime_error("Safety limit: more than 100,000 entries.");
   uint64_t total = 0; std::set<std::string> seen;
   for (const auto& e : entries) {
@@ -178,10 +179,10 @@ void validateEntries(const std::vector<Entry>& entries) {
       if (part.empty() || part == "." || part == ".." || part.back() == '.' || part.back() == ' ' || std::regex_match(part, std::regex("(con|prn|aux|nul|com[0-9]|lpt[0-9])(\\..*)?", std::regex::icase))) throw std::runtime_error("Unsafe archive path.");
     }
     if (!seen.insert(filenameKey(name)).second) throw std::runtime_error("Duplicate archive path after Unicode normalization/case folding.");
-    constexpr uint64_t limit = 20ULL * 1024 * 1024 * 1024;
-    if (e.size > limit - total) throw std::runtime_error("Safety limit: expanded data exceeds 20 GiB.");
+    if (e.size > std::numeric_limits<uint64_t>::max() - total) throw std::runtime_error("Invalid total expanded size.");
     total += e.size;
   }
+  return total;
 }
 static fs::path freshDirectory(const fs::path& parent) {
   std::random_device random;
@@ -414,7 +415,8 @@ fs::path Engine::create(const Options& o, const fs::path& output, const std::vec
         Entry row;row.name=entry.path().lexically_relative(inputs[0]).generic_u8string();row.directory=entry.is_directory();row.link=entry.is_symlink();if(!row.directory&&!row.link){if(!entry.is_regular_file())throw std::runtime_error("Unsupported ISO input file type.");row.size=entry.file_size();}paths.push_back(row);
         if(paths.size()>100000)throw std::runtime_error("ISO input exceeds 100,000 entries.");
       }
-      validateEntries(paths);phase_=1;progress_=-1;
+      if(validateEntries(paths)>20ULL*1024*1024*1024)throw std::runtime_error("ISO input exceeds 20 GiB.");
+      phase_=1;progress_=-1;
 #ifdef _WIN32
       writeIsoImage(inputs[0],staging/requested.filename(),cancelled_,progress_);
 #elif defined(__APPLE__)
@@ -491,7 +493,13 @@ std::vector<fs::path> Engine::extractEach(const std::vector<fs::path>& inputs,co
   return create(options,suggestedArchive(inputs),inputs);
 }
 fs::path Engine::extract(const fs::path& archive,const fs::path& parent,const std::string& password,const std::vector<std::string>& selected) {
-  auto entries=list(archive,password);validateEntries(entries);
+  auto entries=list(archive,password);
+  const auto format=archiveExtension(archive);
+  const bool stagesWholeArchive=format==".alz"||format==".egg"||format==".zpaq";
+  uint64_t requiredBytes=0;
+  // list() has already checked that the sum fits in uint64_t.
+  if (selected.empty() || stagesWholeArchive)
+    for (const auto& entry : entries) requiredBytes += entry.size;
   if(!selected.empty()){
     std::vector<Entry> filtered;
     auto normalize=[](std::string name){std::replace(name.begin(),name.end(),'\\','/');while(!name.empty()&&name.back()=='/')name.pop_back();return name;};
@@ -502,18 +510,21 @@ fs::path Engine::extract(const fs::path& archive,const fs::path& parent,const st
         const auto target=normalize(selected[i]);
         if(!target.empty()&&(path==target||(path.size()>target.size()&&path.compare(0,target.size(),target)==0&&path[target.size()]=='/'))){include=true;matched[i]=true;}
       }
-      if(include)filtered.push_back(entry);
+      if(include){
+        filtered.push_back(entry);
+        if(!stagesWholeArchive)requiredBytes+=entry.size;
+      }
     }
     if(std::find(matched.begin(),matched.end(),false)!=matched.end())throw std::runtime_error("선택한 항목을 압축 파일에서 찾을 수 없습니다.");
     entries=std::move(filtered);
   }
   if(!fs::is_directory(parent))throw std::runtime_error("대상 폴더가 존재하지 않습니다.");
+  if(requiredBytes>fs::space(parent).available)throw std::runtime_error("압축을 풀 대상 드라이브의 여유 공간이 부족합니다.");
   auto staging=freshDirectory(parent);
   fs::path selectionDirectory;
   std::vector<std::pair<fs::path,fs::path>> moved;
   try {
-    const auto format=archiveExtension(archive);
-    if(format==".alz"||format==".egg"||format==".zpaq"){
+    if(stagesWholeArchive){
       std::vector<std::string> args;
       if(format==".zpaq"){
         args={"x",fs::absolute(archive).u8string(),"-to",staging.u8string(),"-threads",parallel_?"0":"1"};

@@ -11,7 +11,7 @@ class PasswordRequired : public std::runtime_error { public: using std::runtime_
 struct Entry { std::string name, modified; uint64_t size = 0, packed = 0; bool directory = false, encrypted = false, link = false; };
 struct Options { std::string format = "zip", password, split; int level = 5; bool hideNames = false, unicodeNames=true, storeTimes=true, excludeThumbs=false, multiThread=true,selfExtracting=false; };
 std::vector<Entry> parseListing(const std::string& text);
-void validateEntries(const std::vector<Entry>& entries);
+uint64_t validateEntries(const std::vector<Entry>& entries);
 std::vector<std::string> createArgs(const Options&, const fs::path&, const std::vector<fs::path>&);
 std::wstring widen(const std::string&);
 std::string narrow(const std::wstring&);

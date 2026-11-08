@@ -53,6 +53,12 @@ int main(int argc,char** argv) {
     }
     kz::Entry a; a.name="a"; kz::Entry b; b.name="A"; rejects([&]{kz::validateEntries({a,b});});
     a.link=true; rejects([&]{kz::validateEntries({a});});
+    kz::Entry large, extra;
+    large.name="large.bin"; large.size=21ULL<<30;
+    extra.name="extra.bin"; extra.size=1;
+    check(kz::validateEntries({large,extra})==large.size+1,"Expanded size above 20 GiB");
+    large.size=UINT64_MAX;
+    rejects([&]{kz::validateEntries({large,extra});});
     check(kz::quoteWindows(L"a b\\")==L"\"a b\\\\\"","Windows trailing slash quoting");
     check(kz::quoteWindows(L"a\"b")==L"\"a\\\"b\"","Windows quote escaping");
     check(kz::splitArgument(0).empty(),"No splitting preset");

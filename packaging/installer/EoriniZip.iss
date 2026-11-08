@@ -1,4 +1,4 @@
-﻿#define AppVersion "0.5.3"
+﻿#define AppVersion "0.5.4"
 #define AppName "어린이zip"
 #ifndef PackageDirectory
 #define PackageDirectory "..\..\dist\EoriniZip"
@@ -21,9 +21,9 @@ ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0
 OutputDir=..\..\dist
 #ifdef TestInstall
-OutputBaseFilename=EoriniZip-0.5.3-installer-test
+OutputBaseFilename=EoriniZip-{#AppVersion}-installer-test
 #else
-OutputBaseFilename=EoriniZip-0.5.3-windows-x64-setup
+OutputBaseFilename=EoriniZip-{#AppVersion}-windows-x64-setup
 #endif
 SetupIconFile=..\..\assets\EoriniZip.ico
 UninstallDisplayIcon={app}\EoriniZip.exe
@@ -33,7 +33,7 @@ WizardStyle=modern
 CloseApplications=no
 RestartApplications=no
 ChangesAssociations=yes
-VersionInfoVersion=0.5.3.0
+VersionInfoVersion={#AppVersion}.0
 [Languages]
 Name: "korean"; MessagesFile: "compiler:Languages\Korean.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
