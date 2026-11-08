@@ -1,19 +1,22 @@
-﻿#define AppVersion "0.5.5"
+﻿#define AppVersion "0.5.6"
 #define AppName "어린이zip"
+#define ReleaseId "{D04F21CE-490B-40EF-91BB-B5EAEE88A5B1}"
+#define TestId "{244F199B-6CB9-4FCF-B031-858B47F0276C}"
 #ifndef PackageDirectory
 #define PackageDirectory "..\..\dist\EoriniZip"
 #endif
 [Setup]
 #ifdef TestInstall
-AppId={{244F199B-6CB9-4FCF-B031-858B47F0276C}
+AppId={{#TestId}
 #else
-AppId={{D04F21CE-490B-40EF-91BB-B5EAEE88A5B1}
+AppId={{#ReleaseId}
 #endif
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppPublisher=EoriniZip
 AppPublisherURL=https://github.com/sjhdeux0114/EoriniZip
 DefaultDirName={localappdata}\Programs\EoriniZip
+UsePreviousAppDir=no
 DefaultGroupName={#AppName}
 PrivilegesRequired=lowest
 ArchitecturesAllowed=x64compatible
@@ -49,7 +52,84 @@ Name: "{group}\{#AppName}"; Filename: "{app}\EoriniZip.exe"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\EoriniZip.exe"; Tasks: desktopicon
 [UninstallRun]
 Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""{app}\windows11-menu.ps1"" -Action Uninstall"; Flags: runhidden waituntilterminated; RunOnceId: "RemoveModernContextMenu"; Check: FileExists(ExpandConstant('{app}\windows11-menu.ps1'))
+[UninstallDelete]
+; A matching, locked shell DLL may have been retained from the prior install.
+Type: files; Name: "{app}\EoriniZipShell_v051.dll"
+Type: files; Name: "{app}\EoriniZipModernShell_v051.dll"
 [Code]
+function HandlePreviousInstall(const AppId: String; Remove: Boolean): String;
+var
+  Key, Dir, Uninstaller, Name, Publisher, Version: String;
+  InstalledVersion, SetupVersion: Int64;
+  Code: Integer;
+  Stream: TFileStream;
+begin
+  Result := '';
+  Key := 'Software\Microsoft\Windows\CurrentVersion\Uninstall\' + AppId + '_is1';
+  if not RegKeyExists(HKCU, Key) then Exit;
+  if IsAdmin then begin
+    Result := '기존 사용자 설치를 업데이트하려면 설치 프로그램을 일반 권한으로 다시 실행하세요.';
+    Exit;
+  end;
+  Result := '기존 어린이zip의 설치 정보를 확인할 수 없습니다. Windows 설치된 앱에서 기존 버전을 제거한 뒤 다시 실행하세요.';
+  if not RegQueryStringValue(HKCU, Key, 'Publisher', Publisher) or
+     (Publisher <> 'EoriniZip') or
+     not RegQueryStringValue(HKCU, Key, 'InstallLocation', Dir) or (Dir = '') or
+     not RegQueryStringValue(HKCU, Key, 'UninstallString', Uninstaller) then Exit;
+  if RegQueryStringValue(HKCU, Key, 'DisplayVersion', Version) and
+     StrToVersion(Version, InstalledVersion) and StrToVersion('{#AppVersion}', SetupVersion) then
+    if InstalledVersion > SetupVersion then begin
+      Result := '이미 더 최신 버전의 어린이zip이 설치되어 있습니다: ' + Version;
+      Exit;
+    end;
+  Dir := RemoveBackslashUnlessRoot(Dir);
+  Uninstaller := RemoveQuotes(Uninstaller);
+  Name := Lowercase(ExtractFileName(Uninstaller));
+  if (CompareText(ExtractFileDir(Uninstaller), Dir) <> 0) or
+     (Length(Name) <> 12) or (Copy(Name, 1, 5) <> 'unins') or
+     (StrToIntDef(Copy(Name, 6, 3), -1) < 0) or (Copy(Name, 9, 4) <> '.exe') then Exit;
+
+  if not FileExists(Uninstaller) then begin
+    // An installation that was manually deleted can leave an Apps entry behind.
+    if not FileExists(AddBackslash(Dir) + 'EoriniZip.exe') and
+       not FileExists(ChangeFileExt(Uninstaller, '.dat')) then
+      if not Remove then Result := ''
+      else if RegDeleteKeyIncludingSubkeys(HKCU, Key) then Result := '';
+    Exit;
+  end;
+  if not FileExists(ChangeFileExt(Uninstaller, '.dat')) then Exit;
+  if FileExists(AddBackslash(Dir) + 'EoriniZip.exe') then
+    try
+      Stream := TFileStream.Create(AddBackslash(Dir) + 'EoriniZip.exe', fmOpenRead or fmShareExclusive);
+      Stream.Free;
+    except
+      Result := '실행 중인 어린이zip을 닫은 후 다시 시도하세요.' + #13#10 + Dir;
+      Exit;
+    end;
+  if not Remove then begin
+    Result := '';
+    Exit;
+  end;
+  Log('Removing previous EoriniZip installation: ' + Dir);
+  Result := '기존 어린이zip 제거를 완료하지 못했습니다.' + #13#10 + Dir;
+  if not ExecAsOriginalUser(Uninstaller, '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG',
+       Dir, SW_HIDE, ewWaitUntilTerminated, Code) then Exit;
+  if (Code <> 0) or RegKeyExists(HKCU, Key) or FileExists(AddBackslash(Dir) + 'EoriniZip.exe') then Exit;
+  Result := '';
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := HandlePreviousInstall('{#TestId}', False);
+#ifndef TestInstall
+  if Result = '' then Result := HandlePreviousInstall('{#ReleaseId}', False);
+#endif
+  if Result = '' then Result := HandlePreviousInstall('{#TestId}', True);
+#ifndef TestInstall
+  if Result = '' then Result := HandlePreviousInstall('{#ReleaseId}', True);
+#endif
+end;
+
 function NeedsShellUpdate(const Name, PackageHash: String): Boolean;
 var
   Path: String;
