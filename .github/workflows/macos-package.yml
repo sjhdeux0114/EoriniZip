@@ -41,7 +41,7 @@ jobs:
       - run: ctest --test-dir build -C Release --output-on-failure
       - name: Package and verify bundled engine
         run: python3 tools/package-macos.py --arch '${{ matrix.arch }}'
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: EoriniZip-0.5.1-macos-${{ matrix.arch }}
           path: |
