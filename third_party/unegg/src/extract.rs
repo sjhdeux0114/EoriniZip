@@ -191,6 +191,9 @@ pub fn extract_entry<R: Read + Seek>(
                 fs::create_dir_all(parent).map_err(EggError::CantOpenDestFile)?;
             }
             fs::File::create(&target).map_err(EggError::CantOpenDestFile)?;
+            if let Some(ft) = entry.file_time {
+                set_file_time(&target, ft);
+            }
         }
         return Ok(());
     }

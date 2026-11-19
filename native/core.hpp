@@ -8,7 +8,7 @@
 namespace kz {
 namespace fs = std::filesystem;
 class PasswordRequired : public std::runtime_error { public: using std::runtime_error::runtime_error; };
-struct Entry { std::string name, modified; uint64_t size = 0, packed = 0; bool directory = false, encrypted = false, link = false; };
+struct Entry { std::string name, modified; uint64_t size = 0, packed = 0; bool directory = false, encrypted = false, link = false, hasCreationTime = false; };
 struct Options { std::string format = "zip", password, split; int level = 5; bool hideNames = false, unicodeNames=true, storeTimes=true, excludeThumbs=false, multiThread=true,selfExtracting=false; };
 std::vector<Entry> parseListing(const std::string& text);
 uint64_t validateEntries(const std::vector<Entry>& entries);

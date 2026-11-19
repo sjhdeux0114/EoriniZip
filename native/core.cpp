@@ -144,7 +144,7 @@ std::vector<Entry> parseListing(const std::string& text) {
   std::vector<Entry> entries; std::map<std::string,std::string> fields;
   auto flush = [&] {
     if (fields.count("Path")) {
-      Entry e; e.name = fields["Path"]; e.modified = fields["Modified"];
+      Entry e; e.name = fields["Path"]; e.modified = fields["Modified"]; e.hasCreationTime = !fields["Created"].empty();
       auto number = [&](const char* key) -> uint64_t {
         const auto& v = fields[key]; if (v.empty()) return 0;
         if (!std::all_of(v.begin(), v.end(), [](unsigned char c){ return std::isdigit(c); })) throw std::runtime_error("Invalid entry size.");
@@ -564,28 +564,48 @@ fs::path Engine::extract(const fs::path& archive,const fs::path& parent,const st
 
     run(args);
     }
-#ifdef _WIN32
-    if(propagateZone_){
-      std::ifstream zone(fs::path(archive.wstring()+L":Zone.Identifier"),std::ios::binary);
-      if(zone){
-        std::string metadata;char buffer[4096];while(zone.read(buffer,sizeof(buffer))||zone.gcount()){metadata.append(buffer,static_cast<size_t>(zone.gcount()));if(metadata.size()>65536)throw std::runtime_error("다운로드 출처 정보가 너무 큽니다.");}
-        for(const auto& entry:fs::recursive_directory_iterator(staging))if(entry.is_regular_file()){
-          std::ofstream output(fs::path(entry.path().wstring()+L":Zone.Identifier"),std::ios::binary);
-          output.write(metadata.data(),static_cast<std::streamsize>(metadata.size()));
-          if(!output)throw std::runtime_error("다운로드 출처 정보를 저장할 수 없습니다.");
-        }
-      }
-    }
-#endif
     if(!selectionDirectory.empty()){fs::remove_all(selectionDirectory);selectionDirectory.clear();}
     // Verify decoded output before publishing, including auxiliary codecs.
     for(const auto& file:fs::recursive_directory_iterator(staging)){
       if(file.is_symlink()||(!file.is_directory()&&!file.is_regular_file()))throw std::runtime_error("Unsafe extracted file type.");
     }
+#ifdef _WIN32
+    std::string zoneMetadata;
+    if(propagateZone_){
+      std::ifstream zone(fs::path(archive.wstring()+L":Zone.Identifier"),std::ios::binary);
+      char buffer[4096];
+      while(zone.read(buffer,sizeof(buffer))||zone.gcount()){
+        zoneMetadata.append(buffer,static_cast<size_t>(zone.gcount()));
+        if(zoneMetadata.size()>65536)throw std::runtime_error("다운로드 출처 정보가 너무 큽니다.");
+      }
+    }
+#endif
     for(const auto& entry:entries)if(!entry.directory){
       auto name=entry.name;std::replace(name.begin(),name.end(),'\\','/');
       auto output=staging/fs::u8path(name);
       if(!fs::is_regular_file(output)||fs::file_size(output)!=entry.size)throw std::runtime_error("Incomplete extracted file: "+name);
+#ifdef _WIN32
+      const bool useModifiedForCreation=!entry.hasCreationTime && (!entry.modified.empty()||stagesWholeArchive);
+      if(useModifiedForCreation||!zoneMetadata.empty()){
+        WIN32_FILE_ATTRIBUTE_DATA info{};
+        if(!GetFileAttributesExW(output.c_str(),GetFileExInfoStandard,&info))
+          throw fs::filesystem_error("Read extracted file dates",output,std::error_code(GetLastError(),std::system_category()));
+        if(!zoneMetadata.empty()){
+          std::ofstream zone(fs::path(output.wstring()+L":Zone.Identifier"),std::ios::binary);
+          zone.write(zoneMetadata.data(),static_cast<std::streamsize>(zoneMetadata.size()));
+          zone.close();
+          if(!zone)throw std::runtime_error("다운로드 출처 정보를 저장할 수 없습니다.");
+        }
+        HANDLE handle=CreateFileW(output.c_str(),FILE_WRITE_ATTRIBUTES,FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
+                                  nullptr,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,nullptr);
+        if(handle==INVALID_HANDLE_VALUE)
+          throw fs::filesystem_error("Open extracted file dates",output,std::error_code(GetLastError(),std::system_category()));
+        const BOOL ok=SetFileTime(handle,useModifiedForCreation?&info.ftLastWriteTime:nullptr,nullptr,&info.ftLastWriteTime);
+        const DWORD error=ok?ERROR_SUCCESS:GetLastError();
+        CloseHandle(handle);
+        if(!ok)throw fs::filesystem_error("Restore extracted file dates",output,std::error_code(error,std::system_category()));
+      }
+#endif
     }
     // Normalize bottom-up only after verifying original archive paths. Retain the
     // original spelling for engine selections; never rename user-owned inputs.

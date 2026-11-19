@@ -83,6 +83,34 @@ int main(int argc,char** argv) {
       auto input=root/kz::fs::u8path("한글.txt"); const std::string content="EoriniZip native round trip 한글";
       {std::ofstream file(input,std::ios::binary); file<<content;}
       kz::Engine engine(kz::fs::u8path(argv[1]));
+#ifdef _WIN32
+      {
+        SYSTEMTIME date{2012,6,0,14,9,30,0,0};
+        FILETIME modified{},created{};
+        check(SystemTimeToFileTime(&date,&modified),"Build historical modification time");
+        date.wYear=2010;
+        check(SystemTimeToFileTime(&date,&created),"Build historical creation time");
+        HANDLE file=CreateFileW(input.c_str(),FILE_WRITE_ATTRIBUTES,0,nullptr,OPEN_EXISTING,0,nullptr);
+        check(file!=INVALID_HANDLE_VALUE,"Open timestamp fixture");
+        BOOL stamped=SetFileTime(file,&created,nullptr,&modified);
+        CloseHandle(file);
+        check(stamped,"Stamp input file");
+        for(bool storeCreated:{false,true}){
+          kz::Options options;options.storeTimes=storeCreated;
+          auto archive=engine.create(options,root/(storeCreated?"with-dates.7z":"mtime-only.zip"),{input});
+          {std::ofstream zone(kz::fs::path(archive.wstring()+L":Zone.Identifier"));zone<<"[ZoneTransfer]\nZoneId=3\n";}
+          auto target=root/archive.stem();kz::fs::create_directory(target);
+          engine.extract(archive,target,"",{input.filename().u8string()});
+          auto output=target/input.filename();
+          WIN32_FILE_ATTRIBUTE_DATA info{};
+          check(GetFileAttributesExW(output.c_str(),GetFileExInfoStandard,&info),"Read extracted dates");
+          check(CompareFileTime(&info.ftLastWriteTime,&modified)==0,"Archived modification time survives zone propagation");
+          check(CompareFileTime(&info.ftCreationTime,storeCreated?&created:&modified)==0,"Archived creation time or mtime fallback");
+          std::ifstream zone(kz::fs::path(output.wstring()+L":Zone.Identifier"));
+          std::string line;std::getline(zone,line);check(line=="[ZoneTransfer]","Zone metadata retained");
+        }
+      }
+#endif
       {
         auto customTemp=root/"custom-temp";kz::fs::create_directory(customTemp);engine.configureTemporaryDirectory(customTemp);
         for(const auto& pair:std::vector<std::pair<std::string,std::string>>{{"gzip","gz"},{"bzip2","bz2"},{"xz","xz"},{"wim","wim"}}){
