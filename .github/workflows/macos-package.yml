@@ -27,7 +27,7 @@ jobs:
     env:
       MACOSX_DEPLOYMENT_TARGET: '13.0'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup toolchain install stable --profile minimal && rustup default stable
       - name: Prepare full 7-Zip and source notices
         run: |
