@@ -10,7 +10,7 @@ Windows Win32 / macOS AppKit?€ C++17 ê³µí†µ ì½”ì–´ë¡?ë§Œë“œ??ë¬´ë£Œ ?•ì¶• ?„ë¡œê
 
 | ?´ì˜ì²´ì œ | ?¤ì¹˜ ?Œì¼ |
 | --- | --- |
-| Windows x64 | [?¤ì¹˜ ?„ë¡œê·¸ë¨](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.9/EoriniZip-0.5.9-windows-x64-setup.exe) |
+| Windows x64 | [?¤ì¹˜ ?„ë¡œê·¸ë¨](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.10/EoriniZip-0.5.10-windows-x64-setup.exe) |
 | Mac Apple Silicon (M1 ?´ìƒ) | [arm64 DMG](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.3/EoriniZip-0.5.3-macos-arm64.dmg) |
 | Mac Intel | [x86_64 DMG](https://github.com/sjhdeux0114/EoriniZip/releases/download/v0.5.3/EoriniZip-0.5.3-macos-x86_64.dmg) |
 
@@ -45,7 +45,7 @@ macOS??ê³µí†µ ì½”ì–´???•ì¶•Â·?´ì œÂ·ê²€?¬ì? ?´ë¦„ ?•ê·œ?”ë? ?¬ìš©?©ë‹ˆ?? Windows
 
 ## ë¹Œë“œ?€ ê²€ì¦?
 
-Windows: Visual Studio 2022 C++ ?„êµ¬, Windows SDK, Rust stable. ê³µì‹ ?„ì²´ 7-Zip 26.05??`7z.exe`, `7z.dll`, `7z.sfx`, `License.txt`, `readme.txt`ë¥?`vendor/7zip`???¡ë‹ˆ?? `7za`/`7zr`???€ì²´í•˜ì§€ ëª»í•©?ˆë‹¤.
+Windows: Visual Studio 2022 C++ ?„êµ¬, Windows SDK, Rust stable. ê³µì‹ ?„ì²´ 7-Zip 26.06??`7z.exe`, `7z.dll`, `7z.sfx`, `License.txt`, `readme.txt`ë¥?`vendor/7zip`???¡ë‹ˆ?? `7za`/`7zr`???€ì²´í•˜ì§€ ëª»í•©?ˆë‹¤.
 
 ```bat
 tools\build-windows.cmd
@@ -95,6 +95,6 @@ ctest --test-dir build --output-on-failure
 python3 tools/package-macos.py --arch "$(uname -m)"
 ```
 
-ë¨¼ì? `vendor/7zip`??ê³µì‹ Mac??7zz, License.txt, readme.txt, 7z2605-src.tar.xzë¥?ì¤€ë¹„í•©?ˆë‹¤. `.github/workflows/macos-package.yml`?ì„œ ??CPU??ë¹Œë“œÂ·?µí•© ê²€??·íŒ¨?¤ì§•Â·???œëª… ê²€ì¦ì„ ?¤í–‰?©ë‹ˆ?? ?¨í‚¤ì§•ì? ?¬í•¨???”ì§„ê³?ì½”ë±?¼ë¡œ ?µí•© ê²€?¬ë? ?¤ì‹œ ?¤í–‰?˜ê³  DMG ë¬´ê²°?±ë„ ?•ì¸?©ë‹ˆ??
+ë¨¼ì? `vendor/7zip`??ê³µì‹ Mac??7zz, License.txt, readme.txt, 7z2606-src.tar.xzë¥?ì¤€ë¹„í•©?ˆë‹¤. `.github/workflows/macos-package.yml`?ì„œ ??CPU??ë¹Œë“œÂ·?µí•© ê²€??·íŒ¨?¤ì§•Â·???œëª… ê²€ì¦ì„ ?¤í–‰?©ë‹ˆ?? ?¨í‚¤ì§•ì? ?¬í•¨???”ì§„ê³?ì½”ë±?¼ë¡œ ?µí•© ê²€?¬ë? ?¤ì‹œ ?¤í–‰?˜ê³  DMG ë¬´ê²°?±ë„ ?•ì¸?©ë‹ˆ??
 
 ?„ì¬ Mac ë°°í¬ë¬¼ì? ad-hoc ?œëª…??ê°œë°œ ë¹Œë“œ?…ë‹ˆ?? Apple Developer ID ?œëª…Â·ê³µì¦???„ë£Œ???¼ë°˜ ë°°í¬?ì? ?„ë‹ˆë©? ?¤ì œ Mac ?€?”í˜• UI ?„ì²´ ê²€ì¦ì? ë³„ë„?…ë‹ˆ??

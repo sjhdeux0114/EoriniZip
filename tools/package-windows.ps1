@@ -49,8 +49,8 @@ Get-ChildItem -LiteralPath $target -File | Select-Object Name,Length
 
 & (Join-Path $PSScriptRoot 'package-licenses.ps1') -Destination ($Destination+'/licenses/rust')
 if($LASTEXITCODE -ne 0){throw 'Dependency license collection failed.'}
-$sourceArchive=Join-Path $root 'vendor/7zip/7z2605-src.tar.xz'
+$sourceArchive=Join-Path $root 'vendor/7zip/7z2606-src.tar.xz'
 if(-not (Test-Path -LiteralPath $sourceArchive)){
- Invoke-WebRequest 'https://github.com/ip7z/7zip/releases/download/26.05/7z2605-src.tar.xz' -OutFile $sourceArchive
+ Invoke-WebRequest 'https://github.com/ip7z/7zip/releases/download/26.06/7z2606-src.tar.xz' -OutFile $sourceArchive
 }
-Copy-Item -LiteralPath $sourceArchive -Destination (Join-Path $target 'licenses/7z2605-src.tar.xz')
+Copy-Item -LiteralPath $sourceArchive -Destination (Join-Path $target 'licenses/7z2606-src.tar.xz')

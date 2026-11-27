@@ -26,9 +26,9 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force vendor/7zip | Out-Null
-          Invoke-WebRequest https://github.com/ip7z/7zip/releases/download/26.05/7z2605-x64.exe -OutFile vendor/7zip-setup.exe
+          Invoke-WebRequest https://github.com/ip7z/7zip/releases/download/26.06/7z2606-x64.exe -OutFile vendor/7zip-setup.exe
           & 7z x vendor/7zip-setup.exe -ovendor/7zip -y
-          Invoke-WebRequest https://github.com/ip7z/7zip/releases/download/26.05/7z2605-src.tar.xz -OutFile vendor/7zip/7z2605-src.tar.xz
+          Invoke-WebRequest https://github.com/ip7z/7zip/releases/download/26.06/7z2606-src.tar.xz -OutFile vendor/7zip/7z2606-src.tar.xz
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
       - run: cmake --build build --config Release
       - run: ctest --test-dir build -C Release --output-on-failure

@@ -80,7 +80,7 @@ def package(build, engine, destination, arch):
         shutil.copy2(ROOT / "third_party" / "zpaq" / "libzpaq.cpp", licenses / "zpaq")
         sevenzip_license = licenses / "7zip"
         sevenzip_license.mkdir()
-        for name in ("License.txt", "readme.txt", "7z2605-src.tar.xz"):
+        for name in ("License.txt", "readme.txt", "7z2606-src.tar.xz"):
             shutil.copy2(engine / name, sevenzip_license / name)
         dependency_notices(licenses / "rust", "aarch64" if arch == "arm64" else "x86_64")
         with (app / "Contents" / "Info.plist").open("rb") as file:

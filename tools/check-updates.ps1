@@ -1,4 +1,4 @@
-﻿param([version]$CurrentVersion='0.5.9',[switch]$Quiet,[switch]$CheckOnly)
+﻿param([version]$CurrentVersion='0.5.10',[switch]$Quiet,[switch]$CheckOnly)
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'update-security.ps1')
 try{

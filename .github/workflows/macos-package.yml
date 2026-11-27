@@ -32,9 +32,9 @@ jobs:
       - name: Prepare full 7-Zip and source notices
         run: |
           mkdir -p vendor/7zip
-          curl -fL https://github.com/ip7z/7zip/releases/download/26.05/7z2605-mac.tar.xz -o vendor/7zip.tar.xz
+          curl -fL https://github.com/ip7z/7zip/releases/download/26.06/7z2606-mac.tar.xz -o vendor/7zip.tar.xz
           tar -xf vendor/7zip.tar.xz -C vendor/7zip
-          curl -fL https://github.com/ip7z/7zip/releases/download/26.05/7z2605-src.tar.xz -o vendor/7zip/7z2605-src.tar.xz
+          curl -fL https://github.com/ip7z/7zip/releases/download/26.06/7z2606-src.tar.xz -o vendor/7zip/7z2606-src.tar.xz
           chmod +x vendor/7zip/7zz
       - run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_OSX_DEPLOYMENT_TARGET=13.0
       - run: cmake --build build --config Release --parallel 3
