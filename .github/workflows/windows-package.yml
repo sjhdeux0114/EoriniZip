@@ -37,7 +37,7 @@ jobs:
         run: |
           ./tools/package-windows.ps1 -BuildDirectory build/Release -Destination dist/EoriniZip-0.5.1
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" /DPackageDirectory="$PWD\dist\EoriniZip-0.5.1" packaging/installer/EoriniZip.iss
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: EoriniZip-windows-installer
           path: |
