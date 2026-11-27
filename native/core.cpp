@@ -395,14 +395,16 @@ void Engine::setComment(const fs::path& input,const std::string& value,const std
     std::error_code ec;fs::remove_all(staging,ec);
   }catch(...){std::error_code ec;fs::remove_all(staging,ec);throw;}
 }
+bool isSameOrInside(const fs::path& candidate, const fs::path& directory) {
+  auto relative=fs::weakly_canonical(candidate).lexically_relative(fs::weakly_canonical(directory));
+  return !relative.empty()&&!relative.is_absolute()&&*relative.begin()!=fs::path("..");
+}
 fs::path Engine::create(const Options& o, const fs::path& output, const std::vector<fs::path>& inputs) {
   createArgs(o,output,inputs);
   const auto requested=fs::absolute(output);
   for(const auto& input:inputs)if(fs::is_directory(input)){
-    auto relative=fs::weakly_canonical(requested.parent_path()).lexically_relative(fs::weakly_canonical(input));
-    if(relative.empty()||(*relative.begin()!=fs::path("..")&&!relative.is_absolute()))throw std::runtime_error("압축 대상 폴더 밖에 결과 파일을 저장하세요.");
-    auto temporaryRelative=fs::weakly_canonical(temporaryDirectory()).lexically_relative(fs::weakly_canonical(input));
-    if(temporaryRelative.empty()||(*temporaryRelative.begin()!=fs::path("..")&&!temporaryRelative.is_absolute()))throw std::runtime_error("설정한 임시 폴더가 압축 대상 안에 있습니다. 대상 밖의 임시 폴더를 선택하세요.");
+    if(isSameOrInside(requested.parent_path(),input))throw std::runtime_error("압축 대상 폴더 밖에 결과 파일을 저장하세요.");
+    if(isSameOrInside(temporaryDirectory(),input))throw std::runtime_error("설정한 임시 폴더가 압축 대상 안에 있습니다. 대상 밖의 임시 폴더를 선택하세요.");
   }
   // Compression staging is kept out of the source/output folder in OS TEMP.
   const auto staging=freshDirectory(temporaryDirectory());

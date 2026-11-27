@@ -1,4 +1,4 @@
-﻿#define AppVersion "0.5.7"
+﻿#define AppVersion "0.5.8"
 #define AppName "어린이zip"
 #define ReleaseId "{D04F21CE-490B-40EF-91BB-B5EAEE88A5B1}"
 #define TestId "{244F199B-6CB9-4FCF-B031-858B47F0276C}"
@@ -45,8 +45,14 @@ Name: "explorer"; Description: "탐색기 우클릭 메뉴 등록"
 Name: "desktopicon"; Description: "바탕 화면 바로 가기 만들기"; Flags: unchecked
 [Files]
 Source: "{#PackageDirectory}\*"; Excludes: "EoriniZipShell_v051.dll,EoriniZipModernShell_v051.dll"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-Source: "{#PackageDirectory}\EoriniZipShell_v051.dll"; DestDir: "{app}"; Flags: ignoreversion; Check: NeedsShellUpdate('EoriniZipShell_v051.dll', '{#GetSHA256OfFile(PackageDirectory + "\EoriniZipShell_v051.dll")}')
-Source: "{#PackageDirectory}\EoriniZipModernShell_v051.dll"; DestDir: "{app}"; Flags: ignoreversion; Check: NeedsShellUpdate('EoriniZipModernShell_v051.dll', '{#GetSHA256OfFile(PackageDirectory + "\EoriniZipModernShell_v051.dll")}')
+#ifndef ShellSha256
+#define ShellSha256 GetSHA256OfFile(PackageDirectory + "\EoriniZipShell_v051.dll")
+#endif
+#ifndef ModernShellSha256
+#define ModernShellSha256 GetSHA256OfFile(PackageDirectory + "\EoriniZipModernShell_v051.dll")
+#endif
+Source: "{#PackageDirectory}\EoriniZipShell_v051.dll"; DestDir: "{app}"; Flags: ignoreversion; Check: NeedsShellUpdate('EoriniZipShell_v051.dll', '{#ShellSha256}')
+Source: "{#PackageDirectory}\EoriniZipModernShell_v051.dll"; DestDir: "{app}"; Flags: ignoreversion; Check: NeedsShellUpdate('EoriniZipModernShell_v051.dll', '{#ModernShellSha256}')
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\EoriniZip.exe"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\EoriniZip.exe"; Tasks: desktopicon

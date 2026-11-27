@@ -18,6 +18,7 @@ std::string narrow(const std::wstring&);
 // Canonical composition for names created on macOS (including decomposed Hangul).
 std::string composeFilename(const std::string&);
 std::wstring quoteWindows(const std::wstring&);
+bool isSameOrInside(const fs::path& candidate, const fs::path& directory);
 class Engine {
  public:
   explicit Engine(fs::path executable) : executable_(fs::absolute(executable)) {}

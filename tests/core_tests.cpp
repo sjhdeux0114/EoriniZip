@@ -74,6 +74,12 @@ int main(int argc,char** argv) {
       kz::Options invalidOptions;invalidOptions.split=invalid;
       rejects([&]{kz::createArgs(invalidOptions,"out.zip",{"input"});});
     }
+#ifdef _WIN32
+    check(kz::isSameOrInside(L"D:\\forkE\\excelparsing\\dist", L"D:\\forkE\\excelparsing\\dist"), "Same directory is inside");
+    check(kz::isSameOrInside(L"D:\\forkE\\excelparsing\\dist\\sub", L"D:\\forkE\\excelparsing\\dist"), "Child directory is inside");
+    check(!kz::isSameOrInside(L"D:\\forkE\\excelparsing", L"D:\\forkE\\excelparsing\\dist"), "Parent directory is outside");
+    check(!kz::isSameOrInside(L"C:\\Users\\Temp", L"D:\\forkE\\excelparsing\\dist"), "Different drive is outside");
+#endif
     std::cout<<"Core unit checks passed\n";
     if(argc<2) {std::cout<<"Integration SKIPPED: supply full 7-Zip executable path\n"; return 0;}
     const char* testRoot=std::getenv("EORINIZIP_TEST_ROOT");
