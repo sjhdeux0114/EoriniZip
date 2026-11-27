@@ -86,7 +86,7 @@ bool savePreferences() {
   }
   RegCloseKey(key);return ok;
 }
-enum { Open=100, CreateFiles, CreateFolder, Extract, Test, Connect, Cancel, Refresh, Home, About, Exit, SelectAll, CopyNames, CloseArchive, SaveAs, OpenFolder, NewWindow, Topmost, ToggleStatus, AppFolder, HelpPage, IssuesPage, Website, FindFile, Preferences, ToggleTree, ColorSettings, ExtractSelected, ExtractSmart, DecryptEasy, AddEntries, DeleteEntries, RenameEntry, DeleteArchive, DeleteArchivePermanent, NewAdminWindow, PreviewEntry, CopyFiles, PasteFiles, ExternalEdit, EditComment, ScanArchive, SavePassword, LoadPassword, DeletePassword, RecoverPassword, RepairZip, CheckUpdates, ToggleToolbar, ViewSettings, LastCommand=ViewSettings };
+enum { Open=100, CreateFiles, CreateFolder, Extract, Test, Connect, Cancel, Refresh, Home, About, Exit, SelectAll, CopyNames, CloseArchive, SaveAs, OpenFolder, NewWindow, Topmost, ToggleStatus, AppFolder, HelpPage, IssuesPage, Website, FindFile, Preferences, ToggleTree, ColorSettings, ExtractSelected, ExtractSmart, ExtractTreeFolder, DecryptEasy, AddEntries, DeleteEntries, RenameEntry, DeleteArchive, DeleteArchivePermanent, NewAdminWindow, PreviewEntry, CopyFiles, PasteFiles, ExternalEdit, EditComment, ScanArchive, SavePassword, LoadPassword, DeletePassword, RecoverPassword, RepairZip, CheckUpdates, ToggleToolbar, ViewSettings, LastCommand=ViewSettings };
 constexpr UINT Finished=WM_APP+1, Startup=WM_APP+2;
 struct Result { std::vector<kz::Entry> entries; bool listing=false; std::string message; bool success=true; bool passwordNeeded=false; kz::fs::path previewFile,previewRoot,clipboardRoot,editFile,editRoot,editArchive; std::string editName,editPassword; uintmax_t editSize=0; kz::fs::file_time_type editStamp{}; std::string recoveredPassword; };
 struct CreateRequest {
@@ -154,8 +154,8 @@ void layout() {
   MoveWindow(homeCreate,w/2+px(2),h/2-px(75),px(160),px(130),TRUE);
   MoveWindow(logo,px(20),px(20),px(60),px(60),TRUE);
   MoveWindow(statusText,px(15),h-px(28),std::max(px(100),w-px(30)),px(24),TRUE);
-  const int ids[]={Open,CreateFiles,CreateFolder,Extract,Test,Cancel,Refresh,Home};
-  for(int i=0;i<8;++i){auto button=GetDlgItem(window,ids[i]+1000);MoveWindow(button,px(10+i*86),px(12),px(80),px(30),TRUE);ShowWindow(button,!home&&preferences.showToolbar?SW_SHOW:SW_HIDE);}
+  const int ids[]={Open,CreateFiles,CreateFolder,Extract,ExtractSelected,Test,Cancel,Refresh,Home};
+  for(int i=0;i<9;++i){auto button=GetDlgItem(window,ids[i]+1000);MoveWindow(button,px(10+i*79),px(12),px(74),px(30),TRUE);ShowWindow(button,!home&&preferences.showToolbar?SW_SHOW:SW_HIDE);}
   const int offset=preferences.showToolbar?0:-42;
   MoveWindow(pathText,px(12),px(56+offset),w-px(24),px(24),TRUE);
   MoveWindow(passwordLabel,px(12),px(91+offset),px(70),px(24),TRUE);
@@ -736,7 +736,7 @@ void launchUpdateCheck(bool quiet){
   auto script=kz::fs::path(kz::win::executablePath()).parent_path()/L"check-updates.ps1";
   if(!kz::fs::is_regular_file(script))throw std::runtime_error("업데이트 확인 스크립트가 설치 폴더에 없습니다.");
   wchar_t system[MAX_PATH];GetSystemDirectoryW(system,MAX_PATH);auto powershell=kz::fs::path(system)/L"WindowsPowerShell/v1.0/powershell.exe";
-  auto line=kz::quoteWindows(powershell.wstring())+L" -NoProfile -ExecutionPolicy Bypass -File "+kz::quoteWindows(script.wstring())+L" -CurrentVersion 0.5.8"+(quiet?L" -Quiet":L"");
+  auto line=kz::quoteWindows(powershell.wstring())+L" -NoProfile -ExecutionPolicy Bypass -File "+kz::quoteWindows(script.wstring())+L" -CurrentVersion 0.5.9"+(quiet?L" -Quiet":L"");
   STARTUPINFOW startup{sizeof(startup)};PROCESS_INFORMATION process{};
   if(!CreateProcessW(powershell.c_str(),line.data(),nullptr,nullptr,FALSE,CREATE_NO_WINDOW,nullptr,nullptr,&startup,&process))throw std::runtime_error("업데이트 확인을 시작할 수 없습니다.");
   CloseHandle(process.hProcess);CloseHandle(process.hThread);
@@ -754,9 +754,9 @@ bool easyCryptFile(const kz::fs::path& file){auto ext=file.extension().wstring()
     if(id==ViewSettings){DialogBoxParamW(GetModuleHandleW(nullptr),MAKEINTRESOURCEW(IDD_SETTINGS),window,settingsProcedure,5);return;}
     if(id==Preferences||id==ColorSettings){DialogBoxParamW(GetModuleHandleW(nullptr),MAKEINTRESOURCEW(IDD_SETTINGS),window,settingsProcedure,id==ColorSettings?5:0);return;}
     if(id==Exit){SendMessageW(window,WM_CLOSE,0,0);return;}
-    if(id==About){MessageBoxW(window,L"어린이zip 0.5.8 · 네이티브 개발 버전\n\nZIP / 7Z / TAR 압축 및 해제\nALZ / EGG / RAR 해제, ZPAQ 압축·해제\nEasyCrypt 2.4 복호화\n\n분할 메뉴의 서비스 이름은 용량 프리셋이며 현재 서비스의 업로드 한도를 보장하지 않습니다.",L"어린이zip 정보",MB_OK);return;}
+    if(id==About){MessageBoxW(window,L"어린이zip 0.5.9 · 네이티브 개발 버전\n\nZIP / 7Z / TAR 압축 및 해제\nALZ / EGG / RAR 해제, ZPAQ 압축·해제\nEasyCrypt 2.4 복호화\n\n분할 메뉴의 서비스 이름은 용량 프리셋이며 현재 서비스의 업로드 한도를 보장하지 않습니다.",L"어린이zip 정보",MB_OK);return;}
     if(id==Home){showHome(!home);return;}
-    if(id==CloseArchive){archive.clear();archiveEntries.clear();visibleEntries.clear();TreeView_DeleteAllItems(tree);ListView_DeleteAllItems(list);SetWindowTextW(pathText,L"");SetWindowTextW(password,L"");showHome(true);return;}
+    if(id==CloseArchive){archive.clear();archiveEntries.clear();visibleEntries.clear();currentFolder.clear();TreeView_DeleteAllItems(tree);ListView_DeleteAllItems(list);SetWindowTextW(pathText,L"");SetWindowTextW(password,L"");showHome(true);return;}
     if(id==Topmost){onTop=!onTop;SetWindowPos(window,onTop?HWND_TOPMOST:HWND_NOTOPMOST,0,0,0,0,SWP_NOMOVE|SWP_NOSIZE);return;}
     if(id==ToggleStatus){statusVisible=!statusVisible;preferences.showStatus=statusVisible;if(!savePreferences())throw std::runtime_error("설정을 저장할 수 없습니다.");ShowWindow(statusText,statusVisible?SW_SHOW:SW_HIDE);layout();return;}
     if(id==NewWindow||id==AppFolder){
@@ -854,7 +854,11 @@ bool easyCryptFile(const kz::fs::path& file){auto ext=file.extension().wstring()
     }
     if(id==ExtractSelected){
       std::vector<std::string> selected;int row=-1;while((row=ListView_GetNextItem(list,row,LVNI_SELECTED))!=-1)selected.push_back(visibleEntries.at(static_cast<size_t>(row)).name);
-      if(selected.empty())throw std::runtime_error("해제할 항목을 먼저 선택하세요.");auto dirs=choose(true);if(dirs.empty())return;archiveTask(input,1,dirs[0],selected,p);return;
+      if(selected.empty()&&!currentFolder.empty())selected.push_back(currentFolder);
+      if(selected.empty())throw std::runtime_error("해제할 파일이나 폴더를 먼저 선택하세요.");auto dirs=choose(true);if(dirs.empty())return;archiveTask(input,1,dirs[0],selected,p);return;
+    }
+    if(id==ExtractTreeFolder){
+      if(currentFolder.empty())throw std::runtime_error("해제할 폴더를 먼저 선택하세요.");auto dirs=choose(true);if(dirs.empty())return;archiveTask(input,1,dirs[0],{currentFolder},p);return;
     }
     if(id==ExtractSmart||id==Extract){auto dirs=choose(true);if(dirs.empty())return;archiveTask(input,id==ExtractSmart?2:1,dirs[0],{},p);return;}
     if(id==Test)archiveTask(input,4,{}, {},p);  }catch(const std::exception& e){MessageBoxW(window,kz::widen(e.what()).c_str(),L"어린이zip",MB_OK|MB_ICONINFORMATION);}
@@ -869,7 +873,7 @@ HMENU menus() {
   item(file,CloseArchive,L"압축 파일 닫기\tF4");item(file,SaveAs,L"다른 이름으로 저장...");
   item(file,DeleteArchive,L"압축 파일 삭제\tCtrl+Del");item(file,DeleteArchivePermanent,L"압축 파일 완전 삭제\tShift+Ctrl+Del");
   item(file,OpenFolder,L"압축 파일이 있는 폴더 열기");item(file,Test,L"압축 파일 테스트\tCtrl+T");
-  item(file,ScanArchive,L"Microsoft Defender로 압축 파일 검사\tCtrl+I");item(file,Extract,L"압축 풀기\tCtrl+E");item(file,ExtractSelected,L"선택한 항목 풀기...");item(file,ExtractSmart,L"알아서 풀기...");sep(file);
+  item(file,ScanArchive,L"Microsoft Defender로 압축 파일 검사\tCtrl+I");item(file,Extract,L"압축 풀기\tCtrl+E");item(file,ExtractSelected,L"선택한 항목 풀기...\tCtrl+Shift+E");item(file,ExtractSmart,L"알아서 풀기...");sep(file);
   item(file,NewWindow,L"새창 띄우기\tCtrl+Shift+N");item(file,NewAdminWindow,L"새창 띄우기(관리자 권한)\tCtrl+Alt+N");sep(file);item(file,Exit,L"종료\tCtrl+W");
   auto edit=add(L"편집(&E)");
   item(edit,RenameEntry,L"이름 바꾸기\tF2");item(edit,AddEntries,L"파일 추가\tIns");item(edit,DeleteEntries,L"파일 삭제\tDel");item(edit,EditComment,L"ZIP 압축 설명 편집\tCtrl+Shift+M");sep(edit);
@@ -892,7 +896,7 @@ void updateMenus() {
   }
   HMENU m=GetMenu(window);
   for(int id=Open;id<=LastCommand;++id)EnableMenuItem(m,id,MF_BYCOMMAND|(busy&&id!=Cancel?MF_GRAYED:MF_ENABLED));
-  for(int id:{SavePassword,LoadPassword,DeletePassword,RecoverPassword,ScanArchive,CopyFiles,PreviewEntry,DeleteArchive,DeleteArchivePermanent,CloseArchive,SaveAs,OpenFolder,Test,Extract,ExtractSelected,ExtractSmart,FindFile,SelectAll,CopyNames,Refresh})
+  for(int id:{SavePassword,LoadPassword,DeletePassword,RecoverPassword,ScanArchive,CopyFiles,PreviewEntry,DeleteArchive,DeleteArchivePermanent,CloseArchive,SaveAs,OpenFolder,Test,Extract,ExtractSelected,ExtractSmart,ExtractTreeFolder,FindFile,SelectAll,CopyNames,Refresh})
     EnableMenuItem(m,id,MF_BYCOMMAND|(!busy&&!archive.empty()?MF_ENABLED:MF_GRAYED));
   bool editable=!busy&&(archive.extension()==L".zip"||archive.extension()==L".7z"||archive.extension()==L".ZIP"||archive.extension()==L".7Z");
   for(int id:{AddEntries,DeleteEntries,RenameEntry,PasteFiles,ExternalEdit})EnableMenuItem(m,id,MF_BYCOMMAND|(editable?MF_ENABLED:MF_GRAYED));
@@ -943,9 +947,9 @@ LRESULT CALLBACK procedure(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp) {
       homeOpen=control(L"BUTTON",L"압축 파일 열기",BS_OWNERDRAW|WS_TABSTOP,Open);
       homeCreate=control(L"BUTTON",L"새로 압축하기",BS_OWNERDRAW|WS_TABSTOP,CreateFiles);
       // Workspace IDs differ for duplicate home buttons; commands route to the same actions.
-      const wchar_t* labels[]={L"열기",L"새 압축",L"폴더 압축",L"압축 풀기",L"검사",L"취소",L"다시 읽기",L"기본 화면"};
-      const int ids[]={Open,CreateFiles,CreateFolder,Extract,Test,Cancel,Refresh,Home};
-      for(int i=0;i<8;++i){auto b=control(L"BUTTON",labels[i],WS_TABSTOP,ids[i]+1000);workspace.push_back(b);controls.push_back(b);}
+      const wchar_t* labels[]={L"열기",L"새 압축",L"폴더 압축",L"압축 풀기",L"선택 풀기",L"검사",L"취소",L"다시 읽기",L"기본 화면"};
+      const int ids[]={Open,CreateFiles,CreateFolder,Extract,ExtractSelected,Test,Cancel,Refresh,Home};
+      for(int i=0;i<9;++i){auto b=control(L"BUTTON",labels[i],WS_TABSTOP,ids[i]+1000);workspace.push_back(b);controls.push_back(b);}
       pathText=control(L"STATIC",L"",SS_PATHELLIPSIS);
       passwordLabel=control(L"STATIC",L"비밀번호",0);
       password=control(L"EDIT",L"",WS_BORDER|ES_PASSWORD|ES_AUTOHSCROLL|WS_TABSTOP);
@@ -1038,8 +1042,77 @@ LRESULT CALLBACK procedure(HWND hwnd,UINT msg,WPARAM wp,LPARAM lp) {
       break;
     }
     case WM_INITMENUPOPUP:updateMenus();return 0;
+    case WM_CONTEXTMENU:{
+      if(busy||archive.empty())break;
+      HWND target=reinterpret_cast<HWND>(wp);
+      if(target!=tree&&target!=list)break;
+      POINT pt{static_cast<int>(static_cast<short>(LOWORD(lp))),static_cast<int>(static_cast<short>(HIWORD(lp)))};
+      bool keyboard=(pt.x==-1&&pt.y==-1);
+      auto addItem=[](HMENU menu,UINT id,const wchar_t* label){auto text=kz::ui::label(label);AppendMenuW(menu,MF_STRING,id,text.c_str());};
+      HMENU popup=CreatePopupMenu();
+      if(!popup)break;
+      if(target==tree){
+        HTREEITEM hitItem=nullptr;
+        if(!keyboard){
+          POINT client=pt;ScreenToClient(tree,&client);
+          TVHITTESTINFO hit{};hit.pt=client;
+          hitItem=TreeView_HitTest(tree,&hit);
+          if(hitItem)TreeView_SelectItem(tree,hitItem);
+        }else{
+          hitItem=TreeView_GetSelection(tree);
+          RECT rc{};if(hitItem&&TreeView_GetItemRect(tree,hitItem,&rc,TRUE)){pt={rc.left,rc.bottom};ClientToScreen(tree,&pt);}
+          else{GetWindowRect(tree,&rc);pt={rc.left+px(16),rc.top+px(16)};}
+        }
+        if(!currentFolder.empty())addItem(popup,ExtractTreeFolder,L"이 폴더만 압축 풀기...");
+        addItem(popup,Extract,L"전체 압축 풀기...");
+        AppendMenuW(popup,MF_SEPARATOR,0,nullptr);
+        addItem(popup,Refresh,L"압축 파일 다시 읽기");
+      }else{
+        if(!keyboard){
+          POINT client=pt;ScreenToClient(list,&client);
+          LVHITTESTINFO hit{};hit.pt=client;
+          int index=ListView_HitTest(list,&hit);
+          if(index>=0&&!(ListView_GetItemState(list,index,LVIS_SELECTED)&LVIS_SELECTED)){
+            ListView_SetItemState(list,-1,0,LVIS_SELECTED|LVIS_FOCUSED);
+            ListView_SetItemState(list,index,LVIS_SELECTED|LVIS_FOCUSED,LVIS_SELECTED|LVIS_FOCUSED);
+          }
+        }else{
+          int row=ListView_GetNextItem(list,-1,LVNI_SELECTED);
+          RECT rc{};if(row>=0&&ListView_GetItemRect(list,row,&rc,LVIR_LABEL)){pt={rc.left,rc.bottom};ClientToScreen(list,&pt);}
+          else{GetWindowRect(list,&rc);pt={rc.left+px(16),rc.top+px(16)};}
+        }
+        int selectedCount=ListView_GetSelectedCount(list);
+        bool editable=!busy&&(archive.extension()==L".zip"||archive.extension()==L".7z"||archive.extension()==L".ZIP"||archive.extension()==L".7Z");
+        if(selectedCount>0){
+          addItem(popup,ExtractSelected,L"선택한 항목 풀기...");
+          if(selectedCount==1){
+            int row=ListView_GetNextItem(list,-1,LVNI_SELECTED);
+            if(row>=0&&static_cast<size_t>(row)<visibleEntries.size()&&!visibleEntries[row].directory)
+              addItem(popup,PreviewEntry,L"선택 파일 미리보기");
+          }
+          AppendMenuW(popup,MF_SEPARATOR,0,nullptr);
+          addItem(popup,CopyFiles,L"클립보드로 파일 복사하기");
+          addItem(popup,CopyNames,L"파일의 경로명을 클립보드로 복사");
+          if(editable){
+            AppendMenuW(popup,MF_SEPARATOR,0,nullptr);
+            if(selectedCount==1)addItem(popup,RenameEntry,L"이름 바꾸기");
+            addItem(popup,DeleteEntries,L"파일 삭제");
+          }
+        }else{
+          if(!currentFolder.empty())addItem(popup,ExtractTreeFolder,L"현재 폴더만 압축 풀기...");
+          addItem(popup,Extract,L"전체 압축 풀기...");
+          AppendMenuW(popup,MF_SEPARATOR,0,nullptr);
+          if(editable)addItem(popup,AddEntries,L"파일 추가");
+          addItem(popup,SelectAll,L"모두 선택");
+        }
+      }
+      UINT chosen=TrackPopupMenu(popup,TPM_RETURNCMD|TPM_RIGHTBUTTON,pt.x,pt.y,0,hwnd,nullptr);
+      DestroyMenu(popup);
+      if(chosen)command(static_cast<int>(chosen));
+      return 0;
+    }
     case WM_COMMAND:{
-      int id=LOWORD(wp);if(id>=Open+1000&&id<=Home+1000)id-=1000;
+      int id=LOWORD(wp);if(id>=Open+1000&&id<=LastCommand+1000)id-=1000;
       if((HIWORD(wp)==0||HIWORD(wp)==1)&&((id>=Open&&id<=LastCommand)||(id>=RecentFirst&&id<=RecentClear)))command(id);return 0;
     }
     case Finished:{
@@ -1116,7 +1189,7 @@ int WINAPI wWinMain(HINSTANCE instance,HINSTANCE,PWSTR,int show) {
   cls.hCursor=LoadCursorW(nullptr,IDC_ARROW);cls.hIcon=LoadIconW(instance,MAKEINTRESOURCEW(1));RegisterClassW(&cls);
   HWND main=CreateWindowW(cls.lpszClassName,L"어린이zip",WS_OVERLAPPEDWINDOW|WS_CLIPCHILDREN,CW_USEDEFAULT,CW_USEDEFAULT,840,620,nullptr,nullptr,instance,nullptr);
   ShowWindow(main,show);UpdateWindow(main);PostMessageW(main,Startup,0,0);
-  ACCEL keys[]={{FVIRTKEY|FCONTROL,'I',ScanArchive},{FVIRTKEY|FCONTROL|FSHIFT,'M',EditComment},{FVIRTKEY,VK_F8,EditComment},{FVIRTKEY|FCONTROL,'C',CopyFiles},{FVIRTKEY|FCONTROL,'V',PasteFiles},{FVIRTKEY,VK_F2,RenameEntry},{FVIRTKEY,VK_INSERT,AddEntries},{FVIRTKEY,VK_DELETE,DeleteEntries},{FVIRTKEY|FCONTROL,'O',Open},{FVIRTKEY|FCONTROL,'N',CreateFiles},{FVIRTKEY|FCONTROL,'A',SelectAll},{FVIRTKEY|FCONTROL,'F',FindFile},{FVIRTKEY|FCONTROL,'T',Test},{FVIRTKEY|FCONTROL,'E',Extract},{FVIRTKEY|FCONTROL,'W',Exit},{FVIRTKEY|FCONTROL|FSHIFT,'N',NewWindow},{FVIRTKEY,VK_F4,CloseArchive},{FVIRTKEY,VK_F6,Home},{FVIRTKEY,VK_F1,About},{FVIRTKEY,VK_F5,Preferences},{FVIRTKEY,VK_F7,ToggleTree}};
+  ACCEL keys[]={{FVIRTKEY|FCONTROL,'I',ScanArchive},{FVIRTKEY|FCONTROL|FSHIFT,'M',EditComment},{FVIRTKEY,VK_F8,EditComment},{FVIRTKEY|FCONTROL,'C',CopyFiles},{FVIRTKEY|FCONTROL,'V',PasteFiles},{FVIRTKEY,VK_F2,RenameEntry},{FVIRTKEY,VK_INSERT,AddEntries},{FVIRTKEY,VK_DELETE,DeleteEntries},{FVIRTKEY|FCONTROL,'O',Open},{FVIRTKEY|FCONTROL,'N',CreateFiles},{FVIRTKEY|FCONTROL,'A',SelectAll},{FVIRTKEY|FCONTROL,'F',FindFile},{FVIRTKEY|FCONTROL,'T',Test},{FVIRTKEY|FCONTROL,'E',Extract},{FVIRTKEY|FCONTROL|FSHIFT,'E',ExtractSelected},{FVIRTKEY|FCONTROL,'W',Exit},{FVIRTKEY|FCONTROL|FSHIFT,'N',NewWindow},{FVIRTKEY,VK_F4,CloseArchive},{FVIRTKEY,VK_F6,Home},{FVIRTKEY,VK_F1,About},{FVIRTKEY,VK_F5,Preferences},{FVIRTKEY,VK_F7,ToggleTree}};
   HACCEL accelerators=CreateAcceleratorTableW(keys,static_cast<int>(std::size(keys)));
   MSG msg;while(GetMessageW(&msg,nullptr,0,0)>0){
     // Preserve ordinary editing shortcuts in the password field.

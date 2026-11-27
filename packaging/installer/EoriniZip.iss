@@ -1,4 +1,4 @@
-﻿#define AppVersion "0.5.8"
+﻿#define AppVersion "0.5.9"
 #define AppName "어린이zip"
 #define ReleaseId "{D04F21CE-490B-40EF-91BB-B5EAEE88A5B1}"
 #define TestId "{244F199B-6CB9-4FCF-B031-858B47F0276C}"
